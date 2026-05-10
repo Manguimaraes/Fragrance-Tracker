@@ -305,9 +305,10 @@ async function loadFromSupabase() {
 }
 
 async function upsertPerfume(p) {
-  const sb = getClient(); if (!sb) return;
+  const sb = getClient(); if (!sb) return null;
   const { error } = await sb.from('perfumes').upsert(perfumeToRow(p));
-  if (error) console.error('Supabase upsert error', error);
+  if (error) { console.error('Supabase upsert error', error); return error; }
+  return null;
 }
 
 async function insertPerfumeToDb(p) {
@@ -557,7 +558,10 @@ ${JSON.stringify(library)}`;
 
   const selectPhoto = async (pid, url) => {
     const perfume = perfumes.find(p => p.id === pid);
-    if (perfume && supabaseConfigured && isOnline) await upsertPerfume({ ...perfume, photoUrl: url });
+    if (perfume && supabaseConfigured && isOnline) {
+      const err = await upsertPerfume({ ...perfume, photoUrl: url });
+      if (err) { setSyncStatus("error"); return; }
+    }
     setPerfumes(prev => prev.map(p => p.id === pid ? { ...p, photoUrl: url } : p));
     if (selected?.id === pid) setSelected(prev => ({ ...prev, photoUrl: url }));
     setPhotoSearch({ loading: false, results: [], forId: null });
@@ -620,6 +624,57 @@ ${JSON.stringify(library)}`;
     if (!ready || !perfumes.length) return;
     store.set(SK, perfumes);
   }, [perfumes, ready]);
+
+  // Real-time sync
+  useEffect(() => {
+    if (!supabaseConfigured || !ready || !isOnline) return;
+    const sb = getClient();
+    if (!sb) return;
+
+    const channel = sb.channel('db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'perfumes' }, async (payload) => {
+        if (payload.eventType === 'DELETE') {
+          setPerfumes(prev => {
+            const next = prev.filter(p => p.id !== payload.old.id);
+            store.set(SK, next);
+            return next;
+          });
+          setSelected(prev => prev?.id === payload.old.id ? null : prev);
+        } else {
+          const { data: row } = await sb.from('perfumes').select('*').eq('id', payload.new.id).single();
+          const { data: logs } = await sb.from('spray_logs').select('*').eq('perfume_id', payload.new.id).order('logged_at', { ascending: true });
+          if (row) {
+            const updated = rowToPerfume(row, logs || []);
+            setPerfumes(prev => {
+              const next = prev.find(p => p.id === updated.id)
+                ? prev.map(p => p.id === updated.id ? updated : p)
+                : [...prev, updated];
+              store.set(SK, next);
+              return next;
+            });
+            setSelected(prev => prev?.id === updated.id ? updated : prev);
+          }
+        }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'spray_logs' }, async (payload) => {
+        const perfumeId = payload.new?.perfume_id || payload.old?.perfume_id;
+        if (!perfumeId) return;
+        const { data: row } = await sb.from('perfumes').select('*').eq('id', perfumeId).single();
+        const { data: logs } = await sb.from('spray_logs').select('*').eq('perfume_id', perfumeId).order('logged_at', { ascending: true });
+        if (row) {
+          const updated = rowToPerfume(row, logs || []);
+          setPerfumes(prev => {
+            const next = prev.map(p => p.id === perfumeId ? updated : p);
+            store.set(SK, next);
+            return next;
+          });
+          setSelected(prev => prev?.id === perfumeId ? updated : prev);
+        }
+      })
+      .subscribe();
+
+    return () => { sb.removeChannel(channel); };
+  }, [ready, supabaseConfigured, isOnline]);
 
   // Daily pick
   useEffect(() => {
@@ -800,19 +855,17 @@ ${JSON.stringify(library)}`;
   const handlePhoto = (e, pid) => {
     const f = e.target.files?.[0]; if (!f) return;
     const r = new FileReader();
-    r.onload = (ev) => {
+    r.onload = async (ev) => {
       const url = ev.target.result;
       if (pid === "new") setForm(p => ({...p, photoUrl: url}));
       else {
-        setPerfumes(prev => {
-          const updated = prev.map(p => p.id === pid ? {...p, photoUrl: url} : p);
-          if (supabaseConfigured && isOnline) {
-            const up = updated.find(p => p.id === pid);
-            if (up) upsertPerfume(up);
-          }
-          return updated;
-        });
+        setPerfumes(prev => prev.map(p => p.id === pid ? {...p, photoUrl: url} : p));
         if (selected?.id === pid) setSelected(prev => ({...prev, photoUrl: url}));
+        const perfume = perfumes.find(p => p.id === pid);
+        if (perfume && supabaseConfigured && isOnline) {
+          const err = await upsertPerfume({...perfume, photoUrl: url});
+          if (err) setSyncStatus("error");
+        }
       }
     };
     r.readAsDataURL(f);
