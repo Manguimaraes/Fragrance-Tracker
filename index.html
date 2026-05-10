@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#ffffff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Fragrance Collection</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: #ffffff !important; }
+  html, body, #root { height: 100%; background-color: #ffffff !important; }
+  body {
+    font-family: 'DM Sans', 'Helvetica Neue', sans-serif;
+    background: #ffffff !important;
+    color: #2e1e28;
+    -webkit-font-smoothing: antialiased;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    overscroll-behavior: none;
+  }
+  input, select, textarea, button { font-family: inherit; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes chatDot {
+    0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+    30% { opacity: 1; transform: translateY(-3px); }
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-type="module">
+const { useState, useEffect, useRef, useCallback } = React;
+
+const ENRICHED_DATA = {
+  "1976": { description: "Floris recreates the spirit of 1976. A warm, spicy oriental with clove, cinnamon, and patchouli anchored by amber and vanilla. Rich and nostalgic.", notes: ["Clove","Cinnamon","Patchouli","Rose","Amber","Vanilla","Sandalwood"], categories: ["Oriental","Spicy","Woody"], year: 2017, perfumer: null, concentration: "Eau de Parfum" },
+  "1988": { description: "A Floris fragrance capturing late 1980s London. Woody, green, and slightly aromatic with vetiver, cedarwood, and oakmoss at its heart.", notes: ["Vetiver","Cedar","Oakmoss","Bergamot","Galbanum","Leather","Amber"], categories: ["Woody","Green","Aromatic"], year: 2017, perfumer: null, concentration: "Eau de Parfum" },
+  "Peau Santal": { description: "A creamy, comforting sandalwood fragrance by Miller Harris. Warm and enveloping, it wraps skin in soft woods, musk, and a gentle sweetness.", notes: ["Sandalwood","Musk","Vanilla","Woody Notes","Amber"], categories: ["Woody","Oriental","Musky"], year: 2019, perfumer: "Mathilde Bijaoui", concentration: "Eau de Parfum" },
+  "Secret Gardenia": { description: "A lush white floral from Miller Harris centered on gardenia, supported by jasmine and tuberose. Creamy, intoxicating, and unmistakably feminine.", notes: ["Gardenia","Jasmine","Tuberose","Ylang-Ylang","Musk","Sandalwood"], categories: ["Floral","Sweet","Musky"], year: 2019, perfumer: "Mathilde Bijaoui", concentration: "Eau de Parfum" },
+  "Tobacolor": { description: "Part of Dior's Maison Christian Dior collection. A playful, candy-coated take on tobacco — honeyed, fruity, and festive rather than dark and smoky.", notes: ["Tobacco","Honey","Cacao","Rose","Saffron","Dried Fruits","Benzoin"], categories: ["Gourmand","Oriental","Spicy"], year: 2021, perfumer: "Francis Kurkdjian", concentration: "Eau de Parfum" },
+  "Captured By Candlelight": { description: "A warm, romantic evening scent from the artisanal London house 4160 Tuesdays. Beeswax, amber, and soft florals evoke flickering candlelight.", notes: ["Beeswax","Amber","Rose","Vanilla","Musk","Woody Notes"], categories: ["Oriental","Floral","Gourmand"], year: null, perfumer: "Sarah McCartney", concentration: "Eau de Parfum" },
+  "Doe In The Snow": { description: "A whimsical creation by Sarah McCartney evoking a fawn in a winter landscape. Clean, cold air meets warm skin musk and soft woods.", notes: ["Musk","Snow","Woody Notes","Iris","Violet","Amber"], categories: ["Musky","Fresh","Woody"], year: null, perfumer: "Sarah McCartney", concentration: "Eau de Parfum" },
+  "The Sexiest Scent on the Planet. Ever. IMHO": { description: "A bold claim from 4160 Tuesdays. A sensual, skin-close blend of musks, woods, and warm spices designed to be irresistibly attractive.", notes: ["Musk","Sandalwood","Amber","Vanilla","Spices","Woody Notes"], categories: ["Musky","Oriental","Woody"], year: null, perfumer: "Sarah McCartney", concentration: "Eau de Parfum" },
+  "The Waft From The Loft": { description: "A nostalgic, atmospheric scent from 4160 Tuesdays. Dusty attic woods, old paper, and warm amber — the smell of forgotten treasures.", notes: ["Woody Notes","Amber","Paper","Dust","Vanilla","Musk"], categories: ["Woody","Aromatic","Oriental"], year: null, perfumer: "Sarah McCartney", concentration: "Eau de Parfum" },
+  "Blu Mediterraneo - Fico di Amalfi": { description: "A sun-drenched Italian fig fragrance from Acqua di Parma. Captures the Amalfi Coast: ripe figs, citrus groves, cedar, and Mediterranean warmth.", notes: ["Fig","Grapefruit","Bergamot","Lemon","Jasmine","Cedar","Benzoin","Pink Pepper"], categories: ["Fresh","Fruity","Green"], year: 1999, perfumer: null, concentration: "Eau de Toilette" },
+  "Blu Mediterraneo - Mandorlo di Sicilia": { description: "Sicilian almond groves in a bottle. A sweet, milky almond note surrounded by orange blossom, vanilla, and white musk. Warm and comforting.", notes: ["Almond","Orange Blossom","Star Anise","Vanilla","White Musk","Tonka Bean"], categories: ["Gourmand","Sweet","Fresh"], year: 2000, perfumer: null, concentration: "Eau de Toilette" },
+  "Colonia Sandalo Concentrée": { description: "Acqua di Parma's take on sandalwood, layered over their classic Colonia citrus base. Creamy, refined, and distinctly Italian in its elegance.", notes: ["Sandalwood","Bergamot","Lavender","Cardamom","Amber","Musk","Tonka Bean"], categories: ["Woody","Aromatic","Fresh"], year: 2019, perfumer: null, concentration: "Eau de Cologne" },
+  "Sakura Eau de Parfum": { description: "Acqua di Parma's tribute to Japanese cherry blossom season. Delicate, airy, and powdery — fleeting pink petals over a soft woody base.", notes: ["Cherry Blossom","Raspberry","Peony","Osmanthus","Cypress","White Musk","Ambroxan"], categories: ["Floral","Powdery","Fresh"], year: 2021, perfumer: null, concentration: "Eau de Parfum" },
+  "Orange Sanguine": { description: "Atelier Cologne's signature cologne absolue. A burst of blood orange juice, bright and zesty, with a warm, slightly woody base. Pure citrus joy.", notes: ["Blood Orange","Mandarin","Jasmine","Geranium","Sandalwood","Amber","Tonka Bean"], categories: ["Citrus","Fresh","Fruity"], year: 2011, perfumer: "Ralf Schwieger", concentration: "Cologne Absolue" },
+  "Lavender on the Rocks": { description: "Atkinsons reinvents lavender with a cocktail twist. Fresh, aromatic lavender shaken with juniper and tonka for a modern, slightly boozy fougère.", notes: ["Lavender","Juniper Berry","Bergamot","Tonka Bean","Musk","Amber","Vanilla"], categories: ["Aromatic","Fougère","Fresh"], year: 2017, perfumer: null, concentration: "Eau de Parfum" },
+  "17 Oud Mosaic": { description: "Banana Republic's affordable take on oud. A mosaic of woods, rose, and oud, surprisingly refined for its price point. Warm and wearable.", notes: ["Oud","Rose","Saffron","Woody Notes","Amber","Musk","Patchouli"], categories: ["Woody","Oriental","Spicy"], year: 2018, perfumer: null, concentration: "Eau de Parfum" },
+  "78 Vintage Green": { description: "A fresh, herbal green fragrance from Banana Republic's Icon collection. Crisp galbanum and vetiver with a woody, mossy base.", notes: ["Galbanum","Vetiver","Green Notes","Cypress","Bergamot","Oakmoss","Musk"], categories: ["Green","Aromatic","Fresh"], year: 2018, perfumer: null, concentration: "Eau de Parfum" },
+  "Cordovan": { description: "Named after the prized leather, this Banana Republic fragrance combines rich leather with rum, tobacco, and warm woods. Dark and masculine.", notes: ["Leather","Rum","Tobacco","Woody Notes","Amber","Vanilla","Spices"], categories: ["Leather","Woody","Gourmand"], year: 2018, perfumer: null, concentration: "Eau de Parfum" },
+  "Slate": { description: "A cool, mineral-tinged woody fragrance from Banana Republic. Clean, modern, and slightly metallic with vetiver and cedar at its core.", notes: ["Vetiver","Cedar","Bergamot","Pepper","Ambroxan","Musk"], categories: ["Woody","Fresh","Aromatic"], year: 2018, perfumer: null, concentration: "Eau de Parfum" },
+  "My Burberry Blush": { description: "A fruity floral from Burberry inspired by a London garden after rain. Pomegranate and lemon open into rose and jasmine, with a wisteria heart.", notes: ["Pomegranate","Lemon","Apple","Rose","Geranium","Jasmine","Wisteria"], categories: ["Floral","Fruity","Fresh"], year: 2017, perfumer: "Francis Kurkdjian", concentration: "Eau de Parfum" },
+  "Botafumeiro": { description: "Named after the giant incense burner in Santiago de Compostela cathedral. A rich, smoky incense fragrance from Carner Barcelona with labdanum, oud, and amber.", notes: ["Incense","Labdanum","Oud","Amber","Styrax","Birch","Elemi","Cinnamon"], categories: ["Smoky","Oriental","Woody"], year: 2015, perfumer: "Shyamala Maisondieu", concentration: "Eau de Parfum" },
+  "Ligea (Ligea la Sirena)": { description: "A Mediterranean citrus from the Capri-based house Carthusia. Named after a siren of myth. Sea salt, citrus, and white flowers capture the island's spirit.", notes: ["Sea Notes","Lemon","Lily of the Valley","Musk","Cedar","Amber"], categories: ["Fresh","Aquatic","Floral"], year: null, perfumer: null, concentration: "Eau de Parfum" },
+  "Balade Sauvage": { description: "A Maison Christian Dior creation by François Demachy. A walk through wild countryside — juniper, honey, and white musk under an open sky.", notes: ["Juniper Berry","Honey","Bergamot","Lavender","White Musk","Vetiver"], categories: ["Aromatic","Fresh","Green"], year: 2018, perfumer: "François Demachy", concentration: "Eau de Parfum" },
+  "Jasmin Des Anges": { description: "From Dior's La Collection Privée. A warm, enveloping jasmine with a honeyed, almost narcotic quality. Sambac jasmine meets apricot and musks.", notes: ["Jasmine Sambac","Apricot","Musk","Woody Notes","Honey","Fruity Notes"], categories: ["Floral","Oriental","Sweet"], year: 2018, perfumer: "François Demachy", concentration: "Eau de Parfum" },
+  "EIGHT & BOB": { description: "The legendary fragrance supposedly created for JFK in the 1930s by a young Frenchman on the Riviera. An elegant, refined citrus-woody eau de toilette.", notes: ["Cardamom","Pink Pepper","Violet Leaf","Amber","Vetiver","Patchouli","Cedar"], categories: ["Woody","Aromatic","Fresh"], year: 2011, perfumer: null, concentration: "Eau de Toilette" },
+  "Jardin du Poete": { description: "An Eau d'Italie fragrance evoking a poet's Mediterranean garden. Fig leaf, citrus, and green herbs over a warm, woody base.", notes: ["Fig Leaf","Lemon","Bergamot","Herbs","Rose","Cedar","Musk"], categories: ["Green","Fresh","Aromatic"], year: 2006, perfumer: "Bertrand Duchaufour", concentration: "Eau de Toilette" },
+  "Rosa Greta": { description: "Eau d'Italie's tribute to the Damask rose. A dewy, transparent rose composition with green and citrus facets — fresh rather than heavy.", notes: ["Damask Rose","Green Notes","Bergamot","Geranium","Cedar","Musk"], categories: ["Floral","Fresh","Green"], year: 2018, perfumer: null, concentration: "Eau de Parfum" },
+  "Archives 69": { description: "Etat Libre d'Orange revisits the spirit of 1969 — free love and patchouli. A modern, clean patchouli with incense and amber underpinnings.", notes: ["Patchouli","Incense","Amber","Musk","Woody Notes","Spices"], categories: ["Woody","Oriental","Aromatic"], year: 2009, perfumer: "Quentin Bisch", concentration: "Eau de Parfum" },
+  "Cologne": { description: "ELDO's take on the classic cologne format. An uncommonly sophisticated citrus-musk composition that elevates the everyday cologne concept.", notes: ["Bergamot","Lemon","Petitgrain","Neroli","Musk","White Tea"], categories: ["Citrus","Fresh","Aromatic"], year: 2008, perfumer: "Antoine Lie", concentration: "Eau de Parfum" },
+  "Dangerous Complicity": { description: "A warm, ambery skin scent from Etat Libre d'Orange. Iris, amber, and musk in a close, intimate composition. Sensual and understated.", notes: ["Iris","Amber","Musk","Woody Notes","Vanilla","Heliotrope"], categories: ["Oriental","Musky","Powdery"], year: 2006, perfumer: "Antoine Lie", concentration: "Eau de Parfum" },
+  "Divin Enfant": { description: "Etat Libre d'Orange's take on childhood — marshmallow sweetness meeting frankincense and myrrh. A gourmand-incense hybrid both innocent and knowing.", notes: ["Marshmallow","Frankincense","Myrrh","Tonka Bean","Vanilla","Musk"], categories: ["Gourmand","Oriental","Sweet"], year: 2006, perfumer: "Antoine Maffei", concentration: "Eau de Parfum" },
+  "Exit The King": { description: "Named after Ionesco's play. A regal, smoky composition of woods, incense, and leather. Theatrical and brooding, with surprising depth.", notes: ["Incense","Leather","Woody Notes","Saffron","Rose","Oud","Amber"], categories: ["Woody","Smoky","Leather"], year: 2017, perfumer: "Quentin Bisch", concentration: "Eau de Parfum" },
+  "Fat Electrician Semi Modern Vetiver": { description: "Etat Libre d'Orange's vetiver stripped of pretension. Buttery, slightly sweet vetiver with myrrh and a gourmand twist. Unexpectedly cozy.", notes: ["Vetiver","Myrrh","Vanilla","Opoponax","Patchouli","Cumin"], categories: ["Woody","Aromatic","Gourmand"], year: 2009, perfumer: "Antoine Lie", concentration: "Eau de Parfum" },
+  "Fils de Dieu du riz et des agrumes": { description: "An ELDO fragrance evoking Southeast Asia. Steamed rice, ginger, and lemon create a serene, meditative composition. Clean, bright, and utterly unique.", notes: ["Rice","Ginger","Lemon","Osmanthus","Musk","Woody Notes"], categories: ["Fresh","Green","Aromatic"], year: 2009, perfumer: "Antoine Lie", concentration: "Eau de Parfum" },
+  "Hermann a mes Cotes me Paraissait une Ombre": { description: "Named after a line from a French novel. A sophisticated leather-iris composition with violet and incense. Literary, elegant, and darkly romantic.", notes: ["Leather","Iris","Violet","Pepper","Incense","Musk","Woody Notes"], categories: ["Leather","Floral","Aromatic"], year: 2006, perfumer: "Antoine Lie", concentration: "Eau de Parfum" },
+  "Jasmin et Cigarette": { description: "Jasmine smoke. ELDO's provocative pairing of heady jasmine with a tobacco-smoke accord. The scent of a glamorous woman with a cigarette in hand.", notes: ["Jasmine","Tobacco","Smoke","Musk","Apricot","Woody Notes"], categories: ["Floral","Smoky","Aromatic"], year: 2006, perfumer: "Antoine Lie", concentration: "Eau de Parfum" },
+  "Noel au Balcon": { description: "Christmas on the balcony. A warm, spiced orange-chestnut composition from ELDO. Festive without being saccharine — cinnamon, chestnut, and amber.", notes: ["Chestnut","Orange","Cinnamon","Ginger","Amber","Vanilla","Musk"], categories: ["Gourmand","Spicy","Oriental"], year: 2007, perfumer: "Antoine Lie", concentration: "Eau de Parfum" },
+  "Remarkable People": { description: "An ELDO creation celebrating remarkable individuals. A bright, peppery citrus opening settles into a warm woody-amber base. Optimistic and uplifting.", notes: ["Pink Pepper","Bergamot","Cardamom","Cedar","Musks","Amber","Woody Notes"], categories: ["Woody","Fresh","Spicy"], year: 2015, perfumer: "Quentin Bisch", concentration: "Eau de Parfum" },
+  "Rien Intense Incense": { description: "An intensified version of ELDO's Rien. Pure, powerful incense with a leather backbone. No sweetness, no compromise — just smoke and solemnity.", notes: ["Incense","Leather","Cumin","Castoreum","Pepper","Woody Notes"], categories: ["Smoky","Leather","Aromatic"], year: 2010, perfumer: "Antoine Lie", concentration: "Eau de Parfum" },
+  "Tilda Swinton Like This": { description: "Created with actress Tilda Swinton, who wanted a fragrance evoking her Scottish home. Named after a Rumi poem. Mathilde Bijaoui crafted a warm, spiced composition centered on pumpkin and immortelle — cozy without being cloying.", notes: ["Tangerine","Ginger","Pumpkin","Immortelle","Neroli","Rose de Grasse","Vetiver","Heliotrope","Musk"], categories: ["Floral","Spicy","Gourmand"], year: 2010, perfumer: "Mathilde Bijaoui", concentration: "Eau de Parfum" },
+  "Tom of Finland": { description: "Inspired by the homoerotic artist. ELDO's tribute is a leather-lavender composition — a classic masculine structure given an underground, subversive edge.", notes: ["Leather","Lavender","Ylang-Ylang","Aldehydes","Birch","Amber","Musk"], categories: ["Leather","Aromatic","Woody"], year: 2007, perfumer: "Antoine Lie", concentration: "Eau de Parfum" },
+  "Vierges et Toreros": { description: "Virgins and bullfighters. An ELDO fragrance contrasting innocence and aggression. Neroli and orange blossom meet leather and incense in a charged duality.", notes: ["Neroli","Orange Blossom","Leather","Incense","Musk","Labdanum"], categories: ["Floral","Leather","Oriental"], year: 2006, perfumer: "Antoine Lie", concentration: "Eau de Parfum" },
+  "Neon Rose": { description: "Floral Street's electric take on rose. Bright, modern, and punchy — rose with a neon attitude, backed by white musk and peony.", notes: ["Rose","Peony","White Musk","Violet","Woody Notes"], categories: ["Floral","Fresh","Musky"], year: 2018, perfumer: "Jerome Epinette", concentration: "Eau de Parfum" },
+  "Ylang-Ylang Espresso": { description: "Floral Street pairs tropical ylang-ylang with roasted espresso. An unexpected gourmand-floral that balances sweetness with bitter coffee depth.", notes: ["Ylang-Ylang","Espresso","Vanilla","Sandalwood","Jasmine","Musk"], categories: ["Gourmand","Floral","Oriental"], year: 2018, perfumer: "Jerome Epinette", concentration: "Eau de Parfum" },
+  "Bouquet de La Reine": { description: "Floris's tribute to royal bouquets. A classic English floral — rose, lily, and violet — delicate, refined, and unmistakably traditional.", notes: ["Rose","Lily","Violet","Iris","Musk","Sandalwood","Moss"], categories: ["Floral","Powdery","Fresh"], year: 2012, perfumer: null, concentration: "Eau de Parfum" },
+  "Cefiro": { description: "A Floris classic, fresh as a sea breeze. Citrus-forward with lime, bergamot, and green tea, and a light woody base. Perfect warm-weather cologne.", notes: ["Lime","Bergamot","Green Tea","Cardamom","Rose","Cedar","Musk"], categories: ["Citrus","Fresh","Green"], year: 2001, perfumer: null, concentration: "Eau de Toilette" },
+  "Eau de Santal": { description: "Floris's refined sandalwood. Creamy, smooth, and quietly luxurious with touches of cedar, musk, and a gentle spice warmth.", notes: ["Sandalwood","Cedar","Musk","Cardamom","Pepper","Woody Notes"], categories: ["Woody","Aromatic","Spicy"], year: null, perfumer: null, concentration: "Eau de Toilette" },
+  "Elite": { description: "A classic Floris gentleman's fragrance. Clean, fresh, and fougère-leaning with lavender, rosemary, and a mossy base. Timeless British grooming.", notes: ["Lavender","Rosemary","Geranium","Cedarwood","Oakmoss","Vetiver","Musk"], categories: ["Fougère","Aromatic","Fresh"], year: 1998, perfumer: null, concentration: "Eau de Toilette" },
+  "Fleur": { description: "A bright, accessible floral from Floris. Rose, jasmine, and lily anchored by sandalwood and musk. Uncomplicated and cheerful.", notes: ["Rose","Jasmine","Lily","Sandalwood","Musk","Bergamot","Peach"], categories: ["Floral","Fresh","Sweet"], year: 2009, perfumer: null, concentration: "Eau de Toilette" },
+  "JF": { description: "Floris JF is a classic woody-fresh masculine. Crisp bergamot and lemon lead into a heart of geranium and cedarwood. A clean, confident signature.", notes: ["Bergamot","Lemon","Geranium","Cedar","Sandalwood","Musk","Amber"], categories: ["Woody","Fresh","Aromatic"], year: 1992, perfumer: null, concentration: "Eau de Toilette" },
+  "Leather Oud": { description: "A rich, animalic composition from Floris combining English leather tradition with Middle Eastern oud. Bold, smoky, and intensely masculine.", notes: ["Oud","Leather","Saffron","Rose","Amber","Woody Notes","Musk"], categories: ["Leather","Woody","Oriental"], year: 2012, perfumer: null, concentration: "Eau de Parfum" },
+  "Night Scented Jasmine": { description: "Floris captures the intoxicating scent of jasmine blooming after dark. Rich, heady white floral with green undertones and a musky trail.", notes: ["Jasmine","Green Notes","Lily","Rose","Musk","Amber","Woody Notes"], categories: ["Floral","Green","Musky"], year: 2007, perfumer: null, concentration: "Eau de Toilette" },
+  "Royal Arms Diamond Edition": { description: "A prestigious Floris release created for the Diamond Jubilee. A sparkling floral-citrus opening with rose, plum, and a regal amber-musk base.", notes: ["Bergamot","Rose","Plum","Iris","Amber","Musk","Sandalwood","Oud"], categories: ["Floral","Oriental","Woody"], year: 2012, perfumer: null, concentration: "Eau de Parfum" },
+  "Seringa": { description: "Named after the mock orange shrub (Philadelphus). A delicate, transparent white floral with green facets — understated and natural.", notes: ["Orange Blossom","Neroli","Green Notes","Musk","Cedarwood","Jasmine"], categories: ["Floral","Green","Fresh"], year: 2011, perfumer: null, concentration: "Eau de Toilette" },
+  "White Rose": { description: "One of Floris's oldest creations. A clean, classic English rose. Pure, unadorned, and refined — the epitome of traditional English florals.", notes: ["Rose","Violet","Iris","Musk","Amber","Woody Notes"], categories: ["Floral","Powdery","Fresh"], year: 1800, perfumer: null, concentration: "Eau de Toilette" },
+  "Zinnia": { description: "A bright, cheerful Floris floral named after the vibrant garden flower. Pink pepper, peony, and freesia over a clean musk base.", notes: ["Peony","Pink Pepper","Freesia","Rose","Musk","Sandalwood","Cedar"], categories: ["Floral","Fresh","Spicy"], year: 2014, perfumer: null, concentration: "Eau de Toilette" },
+  "The Orchid Man": { description: "Frapin's masterpiece by Jérôme Epinette. A luminous, transparent composition of orchid, cocoa, and rum over vetiver. Sophisticated and singular.", notes: ["Orchid","Cocoa","Rum","Vetiver","Cardamom","Ginger","Sandalwood","Musk"], categories: ["Oriental","Woody","Gourmand"], year: 2016, perfumer: "Jérôme Epinette", concentration: "Eau de Parfum" },
+  "Outrageous!": { description: "A Frederic Malle creation by Sophia Grojsman. A big, bold fruity floral — cranberry and passion fruit clash with rose and musk. As advertised: outrageous.", notes: ["Cranberry","Passion Fruit","Rose","Jasmine","Musk","Amber","Vanilla"], categories: ["Fruity","Floral","Sweet"], year: 2009, perfumer: "Sophia Grojsman", concentration: "Eau de Parfum" },
+  "Acqua di Gio": { description: "Giorgio Armani's iconic aquatic from 1996. Sea water, bergamot, and jasmine over patchouli and cedar. Defined a generation of fresh masculine fragrance.", notes: ["Sea Notes","Bergamot","Neroli","Jasmine","Rosemary","Patchouli","Cedar","Musk"], categories: ["Aquatic","Fresh","Aromatic"], year: 1996, perfumer: "Alberto Morillas", concentration: "Eau de Toilette" },
+  "Pi": { description: "Givenchy's tribute to the infinite. A warm, sweet woody-oriental with benzoin, vanilla, and tonka bean. Mathematical precision meets sensual warmth.", notes: ["Mandarin","Basil","Benzoin","Vanilla","Tonka Bean","Cedar","Anise"], categories: ["Oriental","Woody","Gourmand"], year: 1998, perfumer: "Alberto Morillas", concentration: "Eau de Toilette" },
+  "Desert Rosewood": { description: "From Australian house Goldfield & Banks. A dry, woody fragrance capturing the Australian outback. Rosewood, guaiac, and sandalwood over amber.", notes: ["Rosewood","Guaiac Wood","Sandalwood","Amber","Pink Pepper","Iris","Musk"], categories: ["Woody","Aromatic","Earthy"], year: 2017, perfumer: "Hamid Merati-Kashani", concentration: "Eau de Parfum" },
+  "Bois d'Hadrien": { description: "Goutal's ode to the Mediterranean forest. Italian cypress, pine, and citrus create a luminous, green-woody composition. Sunlight through trees.", notes: ["Cypress","Pine","Grapefruit","Bergamot","Vetiver","Musk","Green Notes"], categories: ["Woody","Green","Fresh"], year: 2018, perfumer: "Camille Goutal", concentration: "Eau de Parfum" },
+  "Eau De Charlotte": { description: "A Goutal fragrance of strawberry and musk. Light, playful, and naturally sweet without being cloying. Named for Camille Goutal's daughter.", notes: ["Strawberry","Musk","Raspberry","Pink Pepper","Woody Notes"], categories: ["Fruity","Fresh","Musky"], year: 2009, perfumer: "Camille Goutal, Isabelle Doyen", concentration: "Eau de Toilette" },
+  "Un Matin d'Orage": { description: "A Goutal classic. The moment before a thunderstorm — petrichor, wet leaves, lily, and gardenia. Atmospheric, green, and electric.", notes: ["Gardenia","Lily","Green Notes","Galbanum","Magnolia","Vetiver","Musk"], categories: ["Floral","Green","Fresh"], year: 2009, perfumer: "Isabelle Doyen", concentration: "Eau de Parfum" },
+  "Champs Elysees Eau de Parfum": { description: "Guerlain's homage to the famous Parisian avenue. Mimosa, rose, and almond blossom create a sparkling, feminine stroll down the Champs.", notes: ["Mimosa","Rose","Almond Blossom","Blackcurrant","Hibiscus","Vanilla","Amber"], categories: ["Floral","Powdery","Fresh"], year: 1996, perfumer: "Jean-Paul Guerlain, Olivier Cresp", concentration: "Eau de Parfum" },
+  "Habit Rouge Eau de Parfum": { description: "The EDP version of Guerlain's legendary 1965 masculine. Deeper and richer than the original — leather, amber, and spices with the signature citrus-vanilla DNA.", notes: ["Orange","Lemon","Cinnamon","Rose","Patchouli","Leather","Amber","Vanilla","Benzoin"], categories: ["Oriental","Spicy","Woody"], year: 2003, perfumer: "Jean-Paul Guerlain", concentration: "Eau de Parfum" },
+  "Les Absolus d'Orient Santal Royal": { description: "Guerlain's precious sandalwood from the Absolus d'Orient line. Rich, creamy Indian sandalwood with rose, spices, and a deep amber base.", notes: ["Sandalwood","Rose","Saffron","Cinnamon","Leather","Amber","Oud"], categories: ["Woody","Oriental","Spicy"], year: 2015, perfumer: "Thierry Wasser", concentration: "Eau de Parfum" },
+  "Shalimar Eau de Parfum": { description: "The eternal Guerlain masterpiece, first created in 1925. Bergamot, iris, and jasmine over a legendary vanilla-smoky base. The definition of a classic oriental.", notes: ["Bergamot","Iris","Jasmine","Rose","Vanilla","Opoponax","Benzoin","Tonka Bean","Incense"], categories: ["Oriental","Powdery","Gourmand"], year: 1925, perfumer: "Jacques Guerlain", concentration: "Eau de Parfum" },
+  "H24": { description: "Hermès's modern masculine. A green, metallic scent centered on clary sage and narcissus with a hot-iron metallic accord. Urban and contemporary.", notes: ["Clary Sage","Narcissus","Rosewood","Sclarene","Metallic Notes","Musk"], categories: ["Aromatic","Green","Fresh"], year: 2021, perfumer: "Christine Nagel", concentration: "Eau de Toilette" },
+  "Le Jardin de Monsieur Li": { description: "Hermès's garden series visits China. A composition of kumquat, jasmine, and mint — a contemplative Chinese garden reflected in still water.", notes: ["Kumquat","Jasmine","Mint","Plum","Vetiver","Woody Notes"], categories: ["Citrus","Green","Fresh"], year: 2015, perfumer: "Jean-Claude Ellena", concentration: "Eau de Toilette" },
+  "Boss Bottled Intense": { description: "The intensified version of Hugo Boss's classic masculine. Apple, cinnamon, and clove over a deeper, more woody-ambery base.", notes: ["Apple","Cinnamon","Clove","Geranium","Sandalwood","Cedar","Vanilla","Amber","Musk"], categories: ["Woody","Oriental","Spicy"], year: 2016, perfumer: null, concentration: "Eau de Parfum" },
+  "Muschio e Ambra": { description: "From the Florentine artisans I Profumi di Firenze. A warm, enveloping blend of musk and amber, smooth and quietly opulent.", notes: ["Musk","Amber","Vanilla","Woody Notes","Sandalwood","Tonka Bean"], categories: ["Oriental","Musky","Woody"], year: null, perfumer: null, concentration: "Eau de Parfum" },
+  "Spezie de Medici": { description: "A spice-laden tribute to the Medici court from I Profumi di Firenze. Cinnamon, clove, and nutmeg woven into a rich amber-woody tapestry.", notes: ["Cinnamon","Clove","Nutmeg","Pepper","Amber","Sandalwood","Vanilla","Incense"], categories: ["Spicy","Oriental","Woody"], year: null, perfumer: null, concentration: "Eau de Parfum" },
+  "Vento di Eros": { description: "The wind of Eros, from I Profumi di Firenze. A sensual, floral-woody composition with rose, jasmine, and warm amber. Romantic and classic.", notes: ["Rose","Jasmine","Musk","Amber","Sandalwood","Vanilla","Spices"], categories: ["Floral","Oriental","Musky"], year: null, perfumer: null, concentration: "Eau de Parfum" },
+  "A City On Fire": { description: "Imaginary Authors captures a city ablaze. Smoke, cade oil, and black pepper create an acrid, smoky opening that settles into warm woods and musk.", notes: ["Cade Oil","Smoke","Black Pepper","Woody Notes","Benzoin","Cashmeran","Musk"], categories: ["Smoky","Woody","Spicy"], year: 2013, perfumer: "Josh Meyer", concentration: "Eau de Parfum" },
+  "Cape Heartache": { description: "A deep, woodsy Pacific Northwest scent pairing evergreen forest with strawberry. Part of Josh Meyer's Imaginary Authors concept. Evokes old-growth forests, mountain fog, and the melancholy of lost love.", notes: ["Douglas Fir","Pine Resin","Western Hemlock","Vanilla Leaf","Strawberry","Old Growth","Mountain Fog"], categories: ["Woody","Fruity","Green"], year: 2013, perfumer: "Josh Meyer", concentration: "Eau de Parfum" },
+  "Falling Into The Sea": { description: "Imaginary Authors' oceanic entry. Lemon, bergamot, and sea spray meet lily and cedar — a sun-warmed seaside cliff rather than a fresh aquatic.", notes: ["Lemon","Bergamot","Sea Salt","Lily","Cedar","Amber","Musk"], categories: ["Aquatic","Fresh","Citrus"], year: 2017, perfumer: "Josh Meyer", concentration: "Eau de Parfum" },
+  "Memoirs Of A Trespasser": { description: "Warm, sweet, and slightly dirty. Vanilla, guaiac wood, and myrrh create an intimate, skin-like scent. One of Imaginary Authors' most popular compositions.", notes: ["Vanilla","Guaiac Wood","Myrrh","Coffee","Musk","Benzoin"], categories: ["Oriental","Woody","Gourmand"], year: 2013, perfumer: "Josh Meyer", concentration: "Eau de Parfum" },
+  "Saint Julep": { description: "A boozy mint julep in a bottle. Spearmint, sugar, and a bourbon-like warmth. Summer in the American South, and one of Imaginary Authors' most unique.", notes: ["Spearmint","Julep","Sugar","Vanilla","Woody Notes","Musk"], categories: ["Gourmand","Fresh","Aromatic"], year: 2014, perfumer: "Josh Meyer", concentration: "Eau de Parfum" },
+  "The Cobra and The Canary": { description: "A smoky, resinous incense fragrance from Imaginary Authors. Lapsang souchong tea, tobacco, and orris in a dark, atmospheric composition.", notes: ["Lapsang Souchong","Tobacco","Orris","Bergamot","Black Pepper","Vetiver","Musk"], categories: ["Smoky","Aromatic","Woody"], year: 2013, perfumer: "Josh Meyer", concentration: "Eau de Parfum" },
+  "Yesterday Haze": { description: "A creamy, dreamy fig fragrance from Imaginary Authors. Fig, tonka, and vanilla create a nostalgic sweetness like a lazy afternoon fading to dusk.", notes: ["Fig","Tonka Bean","Vanilla","Almond Milk","Woody Notes","Musk"], categories: ["Gourmand","Fruity","Sweet"], year: 2014, perfumer: "Josh Meyer", concentration: "Eau de Parfum" },
+  "Hinoki": { description: "Issey Miyake's tribute to the sacred Japanese cypress. A clean, meditative woody scent — hinoki wood, incense, and a temple-like serenity.", notes: ["Hinoki","Cypress","Incense","Cedarwood","Nutmeg","Vetiver","Musk"], categories: ["Woody","Aromatic","Green"], year: 2017, perfumer: null, concentration: "Eau de Toilette" },
+  "Artisan Pure": { description: "John Varvatos strips back to essentials. A clean, aquatic-citrus composition with sea notes, clary sage, and musks. Effortless and crisp.", notes: ["Sea Notes","Bergamot","Clary Sage","Mate","Musks","Woody Notes"], categories: ["Fresh","Aquatic","Aromatic"], year: 2017, perfumer: "Rodrigo Flores-Roux", concentration: "Eau de Toilette" },
+  "Pavillon Rouge": { description: "Jovoy Paris's opulent oriental. Rich rose, saffron, and oud layered with amber and benzoin. A contemporary take on classic French-Oriental luxury.", notes: ["Rose","Saffron","Oud","Amber","Benzoin","Patchouli","Musk"], categories: ["Oriental","Woody","Floral"], year: 2012, perfumer: "Jacques Flori", concentration: "Eau de Parfum" },
+  "Bois de Vetiver": { description: "Karl Lagerfeld's tribute to vetiver. A straightforward, well-made vetiver fragrance with citrus and woody notes. Affordable and effective.", notes: ["Vetiver","Bergamot","Grapefruit","Cedar","Pepper","Musk"], categories: ["Woody","Aromatic","Green"], year: 2007, perfumer: null, concentration: "Eau de Toilette" },
+  "Kashnoir": { description: "Laboratorio Olfattivo's cashmere and noir. A dark, smoky composition of leather, woods, and spices. Opulent and enveloping like black cashmere.", notes: ["Leather","Woody Notes","Amber","Spices","Incense","Musk","Oud"], categories: ["Woody","Smoky","Leather"], year: 2012, perfumer: null, concentration: "Eau de Parfum" },
+  "Vanagloria": { description: "The name means vainglory. Laboratorio Olfattivo's rich, baroque composition of tuberose, amber, and benzoin. Unapologetically opulent and theatrical.", notes: ["Tuberose","Amber","Benzoin","Jasmine","Vanilla","Musk","Woody Notes"], categories: ["Floral","Oriental","Sweet"], year: 2013, perfumer: null, concentration: "Eau de Parfum" },
+  "Encre Noire A L'Extreme": { description: "The intensified version of Lalique's cult vetiver. Nathalie Lorson pushed the dark, earthy vetiver further into shadow with cypress and musk — rain-soaked soil in a dense forest at midnight.", notes: ["Vetiver","Cypress","Musk","Cashmere Wood"], categories: ["Woody","Earthy","Green"], year: 2012, perfumer: "Nathalie Lorson", concentration: "Eau de Parfum" },
+  "Santal 33": { description: "Le Labo's cult classic. A smoky, leathery sandalwood that became the unofficial scent of New York City. Cardamom and iris open into Australian sandalwood, cedarwood, and leather wrapped in musk.", notes: ["Cardamom","Iris","Violet","Ambrox","Australian Sandalwood","Cedarwood","Leather","Musk","Papyrus"], categories: ["Woody","Aromatic","Leather"], year: 2011, perfumer: "Frank Voelkl", concentration: "Eau de Parfum" },
+  "Atman Xaman": { description: "Lorenzo Villoresi's spiritual journey. A shamanic composition of resins, woods, and spices. Smoky, deep, and ritualistic.", notes: ["Incense","Resins","Spices","Woody Notes","Amber","Musk","Leather"], categories: ["Oriental","Smoky","Spicy"], year: 2008, perfumer: "Lorenzo Villoresi", concentration: "Eau de Toilette" },
+  "Aura Maris": { description: "Lorenzo Villoresi's marine fragrance. Sea air and citrus over a warm amber-musk base. Mediterranean in spirit, warm rather than cold.", notes: ["Sea Notes","Citrus","Bergamot","Lavender","Amber","Musk","Woody Notes"], categories: ["Aquatic","Fresh","Aromatic"], year: null, perfumer: "Lorenzo Villoresi", concentration: "Eau de Toilette" },
+  "Musk": { description: "Lorenzo Villoresi's pure musk study. A warm, clean skin scent that sits close and radiates gently. Minimalist and intimate.", notes: ["Musk","Amber","Sandalwood","Vanilla","Woody Notes"], categories: ["Musky","Oriental","Woody"], year: null, perfumer: "Lorenzo Villoresi", concentration: "Eau de Toilette" },
+  "Gin Fizz": { description: "Lubin's sparkling cocktail fragrance. Juniper, citrus, and angelica over rose and violet — a literal gin fizz translated into perfume with remarkable accuracy.", notes: ["Juniper","Lemon","Angelica","Rose","Violet","Musk","Woody Notes"], categories: ["Fresh","Citrus","Aromatic"], year: 2012, perfumer: "Thomas Fontaine", concentration: "Eau de Toilette" },
+  "Aoud": { description: "M. Micallef's oud-centered oriental. Rich, dark agarwood with rose, saffron, and amber. A bridge between Middle Eastern opulence and French refinement.", notes: ["Oud","Rose","Saffron","Amber","Sandalwood","Musk","Patchouli"], categories: ["Oriental","Woody","Spicy"], year: 2006, perfumer: "Jean-Claude Astier, Martine Micallef", concentration: "Eau de Parfum" },
+  "Avant Garde": { description: "M. Micallef's fresh, modern masculine. Grapefruit and cardamom over violet leaf and cedarwood. Clean and contemporary without being generic.", notes: ["Grapefruit","Cardamom","Violet Leaf","Cedar","Vetiver","Musk","Amber"], categories: ["Woody","Fresh","Aromatic"], year: 2010, perfumer: "Jean-Claude Astier, Martine Micallef", concentration: "Eau de Parfum" },
+  "Emir": { description: "M. Micallef's regal masculine. A warm, spiced composition with oud, leather, and amber. Designed to evoke the authority and elegance of an emir.", notes: ["Oud","Leather","Amber","Saffron","Rose","Sandalwood","Musk","Spices"], categories: ["Oriental","Leather","Woody"], year: 2010, perfumer: "Jean-Claude Astier, Martine Micallef", concentration: "Eau de Parfum" },
+  "Le Barbier de Tanger": { description: "MDCI's Tangier barbershop. A warm, aromatic fougère that evokes a North African grooming ritual. Lavender, spices, and a rich amber-woody base.", notes: ["Lavender","Spices","Rose","Amber","Cedar","Musk","Tonka Bean","Vanilla"], categories: ["Fougère","Aromatic","Spicy"], year: null, perfumer: null, concentration: "Eau de Parfum" },
+  "Baccarat Rouge 540 Extrait de Parfum": { description: "Named after the temperature at which Baccarat crystal is fired. The extrait deepens the original's luminous saffron and ambergris accord. One of the most recognized niche fragrances worldwide.", notes: ["Jasmine","Saffron","Ambergris","Cedar","Fir Resin","Bitter Almond"], categories: ["Oriental","Woody","Amber"], year: 2017, perfumer: "Francis Kurkdjian", concentration: "Extrait de Parfum" },
+  "By the Fireplace": { description: "Maison Margiela's Replica line captures a crackling hearth on a winter night. Opens with clove and pink pepper, settles into smoky chestnut and guaiac wood, finishes with vanilla-cashmeran warmth.", notes: ["Clove Oil","Pink Pepper","Orange Flower","Chestnut Accord","Guaiac Wood","Juniper","Vanilla Accord","Peru Balsam","Cashmeran"], categories: ["Woody","Smoky","Gourmand"], year: 2015, perfumer: "Marie Salamagne", concentration: "Eau de Toilette" },
+  "Poom Poom": { description: "Maison Matine's playful, fruity fragrance. Bright and candy-like with peach, praline, and musk. Fun, youthful, and unpretentious.", notes: ["Peach","Praline","Raspberry","Musk","Vanilla","Woody Notes"], categories: ["Fruity","Gourmand","Sweet"], year: 2018, perfumer: null, concentration: "Eau de Parfum" },
+  "Cannabis Eau de Parfum": { description: "Malin + Goetz's modern unisex. A clean, herbal interpretation of cannabis — fig, black pepper, and patchouli. More green and fresh than dank.", notes: ["Cannabis","Fig","Black Pepper","Patchouli","White Cedar","Musk","Amber"], categories: ["Green","Woody","Aromatic"], year: 2016, perfumer: null, concentration: "Eau de Parfum" },
+  "Black Intensitive Aoud": { description: "Mancera's intense oud composition. Dark, sweet, and powerful with rose, saffron, and a thick oud-amber base. Built for maximum projection.", notes: ["Oud","Rose","Saffron","Leather","Amber","Vanilla","Musk","Woody Notes"], categories: ["Oriental","Woody","Spicy"], year: 2011, perfumer: null, concentration: "Eau de Parfum" },
+  "Black to Black": { description: "Mancera's dark gourmand. Coffee, leather, and oud wrapped in a thick vanilla-amber blanket. Rich, sweet, and unapologetically bold.", notes: ["Coffee","Leather","Oud","Vanilla","Amber","Spices","Musk"], categories: ["Gourmand","Oriental","Leather"], year: 2016, perfumer: null, concentration: "Eau de Parfum" },
+  "Cedrat Boisee": { description: "One of Mancera's most popular. A bright, zesty citrus opening of Sicilian lemon and bergamot settles into a spicy-woody base with white musk.", notes: ["Sicilian Lemon","Bergamot","Black Currant","Spices","Cedar","White Musk","Sandalwood","Leather"], categories: ["Citrus","Woody","Fresh"], year: 2013, perfumer: null, concentration: "Eau de Parfum" },
+  "Pure Black": { description: "Mandarina Duck's affordable woody-aromatic masculine. Clean, dark woods with a subtle sweetness. Straightforward and easy to wear.", notes: ["Bergamot","Cardamom","Cedarwood","Amber","Musk","Vanilla"], categories: ["Woody","Aromatic","Fresh"], year: 2008, perfumer: null, concentration: "Eau de Toilette" },
+  "Wood and Absinth": { description: "Mark Buxton's herbal-woody creation. Wormwood and green herbs meet smoky woods and incense. Bitter, aromatic, and contemplative.", notes: ["Wormwood","Green Notes","Cedar","Incense","Amber","Musk","Spices"], categories: ["Aromatic","Woody","Green"], year: 2009, perfumer: "Mark Buxton", concentration: "Eau de Parfum" },
+  "African Leather": { description: "Part of Memo's Cuirs Nomades collection, inspired by the African continent. Cardamom steals the show — a warm, spicy composition where the leather accord plays a supporting role. Created by Alienor Massenet.", notes: ["Cardamom","Geranium","Pink Pepper","Bergamot","Saffron","Cumin","Rose","Patchouli","Cinnamon","Leather","Oud","Amber","Vetiver","Musk"], categories: ["Leather","Spicy","Woody"], year: 2015, perfumer: "Alienor Massenet", concentration: "Eau de Parfum" },
+  "Granada": { description: "Memo Paris's tribute to the Andalusian city. Orange blossom, saffron, and warm spices over a leather-amber base. Southern Spain in a bottle.", notes: ["Orange Blossom","Saffron","Cardamom","Rose","Leather","Amber","Musk","Cedar"], categories: ["Spicy","Floral","Oriental"], year: 2015, perfumer: "Alienor Massenet", concentration: "Eau de Parfum" },
+  "Irish Leather": { description: "Memo's nod to co-founder John Molloy's Irish roots. A green, herbal leather with juniper, mate, and birch. Cool, windswept, and distinctly Atlantic.", notes: ["Juniper","Mate","Birch","Leather","Iris","Musk","Cedar","Moss"], categories: ["Leather","Green","Aromatic"], year: 2013, perfumer: "Alienor Massenet", concentration: "Eau de Parfum" },
+  "Jannat": { description: "Arabic for paradise. Memo Paris's Middle Eastern-inspired composition of oud, rose, and incense. Warm, devotional, and quietly luxurious.", notes: ["Oud","Rose","Incense","Amber","Saffron","Musk","Sandalwood"], categories: ["Oriental","Woody","Floral"], year: 2019, perfumer: null, concentration: "Eau de Parfum" },
+  "Moon Fever": { description: "Memo Paris's cosmic creation. A metallic-woody composition of aldehyde, pink pepper, and patchouli suggesting the cold, dusty surface of the moon.", notes: ["Aldehydes","Pink Pepper","Patchouli","Benzoin","Vanilla","Woody Notes","Musk"], categories: ["Woody","Aromatic","Oriental"], year: 2017, perfumer: "Alienor Massenet", concentration: "Eau de Parfum" },
+  "Shams Oud": { description: "Sun oud. Memo Paris pairs luminous citrus and saffron with a rich oud base. Brighter and more accessible than typical oud compositions.", notes: ["Oud","Saffron","Bergamot","Rose","Amber","Incense","Musk","Woody Notes"], categories: ["Oriental","Woody","Spicy"], year: 2013, perfumer: "Alienor Massenet", concentration: "Eau de Parfum" },
+  "Vadhoo": { description: "Named after the Maldivian island famous for its bioluminescent waters. A marine-woody scent with aquatic freshness and warm amber undertones.", notes: ["Sea Notes","Bergamot","Lotus","Vetiver","Amber","Musk","Woody Notes"], categories: ["Aquatic","Fresh","Woody"], year: 2019, perfumer: null, concentration: "Eau de Parfum" },
+  "Brighton Rock": { description: "Miller Harris's British seaside nostalgia. Named after Graham Greene's novel, it captures candy floss, sea air, and warm wood. Sweet and atmospheric.", notes: ["Candy Floss","Sea Salt","Tonka Bean","Musk","Amber","Woody Notes"], categories: ["Gourmand","Sweet","Fresh"], year: 2019, perfumer: "Mathilde Bijaoui", concentration: "Eau de Parfum" },
+  "La Fumée Alexandrie": { description: "Miller Harris's smoky series visits Alexandria. Egyptian incense meets cinnamon, oud, and amber. A warm, resinous composition evoking ancient trade routes.", notes: ["Incense","Cinnamon","Oud","Amber","Rose","Musk","Woody Notes"], categories: ["Smoky","Oriental","Spicy"], year: 2015, perfumer: "Lyn Harris", concentration: "Eau de Parfum" },
+  "La Fumée Arabie": { description: "The Arabian chapter of Miller Harris's smoke series. Rich, dark oud with frankincense and myrrh. A deeper, more intense take on Middle Eastern incense.", notes: ["Oud","Frankincense","Myrrh","Saffron","Rose","Amber","Musk"], categories: ["Smoky","Oriental","Woody"], year: 2015, perfumer: "Lyn Harris", concentration: "Eau de Parfum" },
+  "Noix de Tubereuse": { description: "Miller Harris pairs tuberose with coconut and almond for a creamy, tropical-floral composition. Rich white flowers warmed by nutty, milky undertones.", notes: ["Tuberose","Coconut","Almond","Jasmine","Musk","Sandalwood","Vanilla"], categories: ["Floral","Gourmand","Sweet"], year: 2012, perfumer: "Lyn Harris", concentration: "Eau de Parfum" },
+  "Aoud Leather": { description: "Montale's marriage of oud and leather. A rich, animalic composition where both elements fight for dominance. Bold and uncompromising.", notes: ["Oud","Leather","Rose","Amber","Musk","Woody Notes","Patchouli"], categories: ["Leather","Oriental","Woody"], year: 2009, perfumer: "Pierre Montale", concentration: "Eau de Parfum" },
+  "Fougères Marines": { description: "Montale's aquatic fougère. A marine-aromatic composition where sea notes meet lavender and herbs over a woody-musk base. Fresh and bracing.", notes: ["Sea Notes","Lavender","Bergamot","Herbs","Oakmoss","Cedar","Musk","Amber"], categories: ["Fougère","Aquatic","Aromatic"], year: 2011, perfumer: "Pierre Montale", concentration: "Eau de Parfum" },
+  "Explorer": { description: "Montblanc's popular woody-aromatic. Italian bergamot, vetiver, and patchouli create a clean, adventurous scent. Often compared to Aventus at an accessible price.", notes: ["Bergamot","Pink Pepper","Clary Sage","Vetiver","Patchouli","Akigalawood","Cacao","Leather","Ambroxan"], categories: ["Woody","Aromatic","Fresh"], year: 2019, perfumer: "Jordi Fernandez, Antoine Maisondieu, Olivier Pescheux", concentration: "Eau de Parfum" },
+  "A*Men Pure Havane": { description: "Mugler's gourmand tobacco. Honey, tobacco, and vanilla over the signature A*Men tar and patchouli base. Like a fine Cuban cigar dipped in honey.", notes: ["Honey","Tobacco","Vanilla","Cacao","Patchouli","Tonka Bean","Benzoin"], categories: ["Gourmand","Oriental","Sweet"], year: 2011, perfumer: null, concentration: "Eau de Toilette" },
+  "Absinth": { description: "Nasomatto's green, herbal extrait. Wormwood, green notes, and vetiver evoke degrees of hysteria. Sharp, bitter, and bracingly aromatic.", notes: ["Wormwood","Green Notes","Vetiver","Herbs","Musk"], categories: ["Aromatic","Green","Woody"], year: 2008, perfumer: "Alessandro Gualtieri", concentration: "Extrait de Parfum" },
+  "Baraonda": { description: "Nasomatto's whiskey fragrance. An unmistakably realistic whiskey note blended with rose, ambroxan, and warm woods. Oriental, boozy, and refined.", notes: ["Whiskey","Woody Notes","Ambrette","Rose","Ambroxan","Musk"], categories: ["Oriental","Woody","Gourmand"], year: 2016, perfumer: "Alessandro Gualtieri", concentration: "Extrait de Parfum" },
+  "Black Afgano": { description: "A dark, resinous extrait de parfum by Alessandro Gualtieri, inspired by the finest hashish. Six years in development, launched in 2009. An intense, smoky composition that evokes temporary bliss through layers of cannabis, dark woods, and incense.", notes: ["Cannabis","Green Notes","Davana","Saffron","Thyme","Coffee","Tobacco","Cinnamon","Violet","Agarwood (Oud)","Incense","Amber","Guaiac Wood","Musk","Tonka","Cedar","Vanilla"], categories: ["Woody","Aromatic","Oriental"], year: 2009, perfumer: "Alessandro Gualtieri", concentration: "Extrait de Parfum" },
+  "Blamage": { description: "The beautiful mistake. Nasomatto's unconventional composition of birch, white woods, leather, and musk. Polarizing, woody-musky, and deliberately off-kilter.", notes: ["Birch","White Woods","Leather","Musk"], categories: ["Woody","Musky","Leather"], year: 2014, perfumer: "Alessandro Gualtieri", concentration: "Extrait de Parfum" },
+  "Duro": { description: "Italian for hard or tough. Nasomatto's expression of masculine strength. Dark woods, leather, and sandalwood with a smoky, earthy character.", notes: ["Woody Notes","Leather","Sandalwood","Incense","Amber","Musk"], categories: ["Woody","Leather","Smoky"], year: 2008, perfumer: "Alessandro Gualtieri", concentration: "Extrait de Parfum" },
+  "Narcotic Venus": { description: "Nasomatto's ode to female sensuality. An intensely floral extrait of tuberose, lily, jasmine, and spices. Narcotic and heady in the best sense.", notes: ["Tuberose","Lily","Jasmine","Spices"], categories: ["Floral","Sweet","Oriental"], year: 2008, perfumer: "Alessandro Gualtieri", concentration: "Extrait de Parfum" },
+  "Nudiflorum": { description: "Stripped bare. Nasomatto's skin-intimate composition with rhubarb, raspberry, rose, and a leather-animalic base. A tender, fleshy fragrance of closeness.", notes: ["Rhubarb","Raspberry","Rose","Amyl Salicylate","Leather","Animal Notes","Oakmoss","Cedar"], categories: ["Floral","Woody","Musky"], year: 2018, perfumer: "Alessandro Gualtieri", concentration: "Extrait de Parfum" },
+  "Pardon": { description: "Nasomatto's most polished masculine. Dark chocolate, magnolia, and oud in a rich, sophisticated composition. Woody, gourmand, and spicy with superb longevity.", notes: ["Dark Chocolate","Magnolia","Oud","Flowers","Tonka Bean","Sandalwood","Spices"], categories: ["Woody","Gourmand","Spicy"], year: 2011, perfumer: "Alessandro Gualtieri", concentration: "Extrait de Parfum" },
+  "Silver Musk": { description: "Nasomatto's quest for mercurial magnetism. A transparent, metallic musk composition — clean, ethereal, and strangely magnetic.", notes: ["Musk","Metallic Notes","Amber","Woody Notes"], categories: ["Musky","Fresh","Aromatic"], year: 2008, perfumer: "Alessandro Gualtieri", concentration: "Extrait de Parfum" },
+  "Kredo": { description: "Nishane's woody-aromatic composition. A refined, well-balanced blend of woods, spices, and florals with a warm amber base.", notes: ["Bergamot","Pink Pepper","Iris","Cedar","Vetiver","Amber","Musk","Patchouli"], categories: ["Woody","Aromatic","Spicy"], year: 2019, perfumer: null, concentration: "Extrait de Parfum" },
+  "Papilefiko": { description: "A Nishane fig fragrance from the Shadow Play collection. Creamy, sweet fig with coconut milk and warm woods. Summery and lush.", notes: ["Fig","Coconut Milk","Bergamot","Green Notes","Cedar","Musk","Vanilla","Benzoin"], categories: ["Fruity","Gourmand","Green"], year: 2021, perfumer: null, concentration: "Extrait de Parfum" },
+  "Wulóng Chá": { description: "Nishane's tribute to oolong tea. A delicate, aromatic composition of tea, citrus, and florals. Sophisticated, calming, and refined.", notes: ["Oolong Tea","Bergamot","Elemi","Orris","Cedar","Musk","Benzoin"], categories: ["Aromatic","Fresh","Woody"], year: 2019, perfumer: null, concentration: "Extrait de Parfum" },
+  "Flash Back": { description: "Olfactive Studio's photographic concept fragrance. A green, herbal composition with lavender, cannabis, and woody notes. Reminiscent and atmospheric.", notes: ["Cannabis","Lavender","Fig Leaf","Cedar","Musk","Amber","Woody Notes"], categories: ["Green","Aromatic","Woody"], year: 2011, perfumer: "Dorothée Piot", concentration: "Eau de Parfum" },
+  "Champaca": { description: "Ormonde Jayne's take on the intensely fragrant champaca flower. Rich, exotic, and tropical — champaca, cardamom, and sandalwood in a luxurious blend.", notes: ["Champaca","Cardamom","Saffron","Osmanthus","Sandalwood","Amber","Musk","Cedar"], categories: ["Floral","Oriental","Woody"], year: 2002, perfumer: "Geza Schoen", concentration: "Eau de Parfum" },
+  "Sampaquita": { description: "Named after the Philippine national flower (Arabian jasmine). Ormonde Jayne's lush, tropical jasmine with ylang-ylang and frangipani.", notes: ["Jasmine Sambac","Ylang-Ylang","Frangipani","Violet Leaf","Vanilla","Sandalwood","Musk"], categories: ["Floral","Tropical","Sweet"], year: 2004, perfumer: "Geza Schoen", concentration: "Eau de Parfum" },
+  "Azur Riviera": { description: "Parfums Berdoues evokes the French Riviera. Bright citrus, sea spray, and aromatic herbs capture the azure coast. Clean, fresh, and Mediterranean.", notes: ["Bergamot","Lemon","Sea Notes","Rosemary","Neroli","Cedar","Musk"], categories: ["Fresh","Citrus","Aquatic"], year: 2018, perfumer: null, concentration: "Eau de Parfum" },
+  "Oud Wa Ward": { description: "Arabic for oud and rose. Parfums Berdoues pairs these classic Middle Eastern elements in a warm, refined composition with saffron and amber.", notes: ["Oud","Rose","Saffron","Amber","Musk","Sandalwood","Woody Notes"], categories: ["Oriental","Floral","Woody"], year: 2018, perfumer: null, concentration: "Eau de Parfum" },
+  "Russkaya Kozha": { description: "Russian for Russian leather. Parfums Berdoues's take on the legendary leather accord with birch tar, tobacco, and smoky woods.", notes: ["Leather","Birch Tar","Tobacco","Smoky Notes","Amber","Woody Notes","Musk"], categories: ["Leather","Smoky","Woody"], year: 2018, perfumer: null, concentration: "Eau de Parfum" },
+  "Selva do Brazil": { description: "Parfums Berdoues ventures into the Brazilian jungle. Tropical fruits, green notes, and rich woods create a lush, vibrant composition.", notes: ["Tropical Fruits","Green Notes","Mate","Woody Notes","Amber","Musk","Vetiver"], categories: ["Green","Fruity","Woody"], year: 2018, perfumer: null, concentration: "Eau de Parfum" },
+  "Blenheim Bouquet": { description: "Penhaligon's classic from 1902, created for the Duke of Marlborough. A crisp, peppery citrus that remains one of the finest traditional English colognes.", notes: ["Lemon","Lime","Lavender","Black Pepper","Pine","Musk","Amber"], categories: ["Citrus","Aromatic","Spicy"], year: 1902, perfumer: null, concentration: "Eau de Toilette" },
+  "Castile": { description: "A clean, herbaceous Penhaligon's fragrance reminiscent of Castile soap. Lavender, rosemary, and white florals over a gentle musky base.", notes: ["Lavender","Rosemary","Neroli","Lily","White Musk","Sandalwood"], categories: ["Aromatic","Fresh","Floral"], year: 1998, perfumer: null, concentration: "Eau de Toilette" },
+  "Endymion Concentré": { description: "The intensified version of Penhaligon's Endymion. Richer, deeper, and more enveloping — coffee, lavender, and geranium with a suede-like base.", notes: ["Coffee","Lavender","Geranium","Suede","Musk","Incense","Amber","Cedar"], categories: ["Aromatic","Woody","Spicy"], year: 2019, perfumer: "Bertrand Duchaufour", concentration: "Eau de Parfum" },
+  "Lily of the Valley": { description: "Penhaligon's single-note tribute to the classic English spring flower. Fresh, green, and delicate — a faithful rendition of muguet.", notes: ["Lily of the Valley","Green Notes","Musk","Woody Notes"], categories: ["Floral","Green","Fresh"], year: 1976, perfumer: null, concentration: "Eau de Toilette" },
+  "Lothair": { description: "A Penhaligon's from their Trade Routes collection. Bright, spicy black tea with cardamom, lavender, and a warm, honeyed base. Named after a Carolingian king.", notes: ["Black Tea","Cardamom","Lavender","Rose","Honey","Amber","Musk","Vanilla"], categories: ["Aromatic","Spicy","Oriental"], year: 2015, perfumer: "Bertrand Duchaufour", concentration: "Eau de Parfum" },
+  "Monsieur Beauregard": { description: "From Penhaligon's Portraits collection. A suave, fruity leather inspired by a dashing bulldog character. Fruity top, iris heart, leather base.", notes: ["Pear","Bergamot","Iris","Suede","Leather","Tonka Bean","Amber","Musk"], categories: ["Leather","Fruity","Woody"], year: 2019, perfumer: null, concentration: "Eau de Parfum" },
+  "Opus 1870": { description: "A Penhaligon's woody-spicy composition with a barbershop quality. Warm spices, cedar, and musk with a herbal edge. Traditional and comforting.", notes: ["Cardamom","Cinnamon","Black Pepper","Cedar","Sandalwood","Musk","Patchouli","Amber"], categories: ["Spicy","Woody","Aromatic"], year: 2014, perfumer: null, concentration: "Eau de Toilette" },
+  "Orange Blossom": { description: "Penhaligon's pure orange blossom soliflore. A fresh, radiant white floral that captures the bitter-sweet beauty of neroli. Simple and elegant.", notes: ["Orange Blossom","Neroli","Petitgrain","Musk","Cedar"], categories: ["Floral","Citrus","Fresh"], year: 1976, perfumer: null, concentration: "Eau de Toilette" },
+  "Sartorial": { description: "A contemporary fougère inspired by the workroom of Norton & Sons, bespoke tailors of Savile Row. Created by Bertrand Duchaufour — metallic shears, rubbed fabric, chalk dust, and old paper patterns vanilla with age.", notes: ["Aldehydes","Metallic Notes","Violet Leaf","Neroli","Cardamom","Black Pepper","Ginger","Beeswax","Cyclamen","Linden Blossom","Lavender","Leather","Oakmoss","Honey","Patchouli","Myrrh","Cedarwood","Tonka Bean","Vanilla","Amber"], categories: ["Fougère","Aromatic","Spicy"], year: 2010, perfumer: "Bertrand Duchaufour", concentration: "Eau de Toilette" },
+  "The Ingenue Cousin Flora": { description: "From Penhaligon's Portraits collection. A bright, innocent floral with rose, peony, and musk. The ingenue of the family — fresh, sweet, and charming.", notes: ["Rose","Peony","Muguet","Musk","Raspberry","Sandalwood","Amber"], categories: ["Floral","Fresh","Sweet"], year: 2018, perfumer: null, concentration: "Eau de Parfum" },
+  "The Tragedy of Lord George": { description: "A Penhaligon's Portrait fragrance. A conflicted masculine — brandy, tonka bean, and lavender create a distinguished yet brooding character.", notes: ["Brandy","Tonka Bean","Lavender","Styrax","Cinnamon","Iris","Musk","Amber"], categories: ["Oriental","Aromatic","Gourmand"], year: 2016, perfumer: "Alberto Morillas", concentration: "Eau de Parfum" },
+  "Luna Rossa": { description: "Prada's athletic-fresh masculine. Lavender and bitter orange over ambroxan and ambrette. Clean, modern, and designed for movement.", notes: ["Lavender","Bitter Orange","Ambroxan","Ambrette"], categories: ["Aromatic","Fresh","Woody"], year: 2012, perfumer: "Daniela Andrier", concentration: "Eau de Toilette" },
+  "Luna Rossa Carbon Eau de Toilette": { description: "The carbon edition pushes Luna Rossa into darker, more metallic territory. Lavender and bergamot meet a drier, more mineral base.", notes: ["Lavender","Bergamot","Metallic Notes","Ambroxan","Patchouli"], categories: ["Aromatic","Fresh","Woody"], year: 2017, perfumer: "Daniela Andrier", concentration: "Eau de Toilette" },
+  "Prada Amber Pour Homme (Prada Man)": { description: "Prada's refined masculine. A sophisticated amber-fougère with saffron, myrrh, and patchouli. Intellectual, understated, and unmistakably Prada.", notes: ["Saffron","Myrrh","Patchouli","Amber","Sandalwood","Tonka Bean","Leather","Vanilla"], categories: ["Oriental","Fougère","Woody"], year: 2006, perfumer: "Daniela Andrier", concentration: "Eau de Toilette" },
+  "Polo Blue": { description: "Ralph Lauren's aquatic-woody masculine. Melon, cucumber, and basil over suede and patchouli. The preppy American alternative to European aquatics.", notes: ["Melon","Cucumber","Basil","Sage","Wisteria","Suede","Patchouli","Musk","Wood"], categories: ["Fresh","Aquatic","Woody"], year: 2003, perfumer: "Carlos Benaim, Christophe Laudamiel", concentration: "Eau de Toilette" },
+  "Eau de Rochas Homme": { description: "A classic French aromatic from 1993. Citrus, herbs, and a mossy-woody base. Clean, elegant, and timeless — an underappreciated barbershop classic.", notes: ["Bergamot","Grapefruit","Mint","Sage","Cedar","Oakmoss","Musk","Amber"], categories: ["Aromatic","Citrus","Fougère"], year: 1993, perfumer: "Nicolas Mamounas", concentration: "Eau de Toilette" },
+  "Le Temps Perdu": { description: "Lost time, from Amsterdam-based Salle Privée. A warm, woody-amber composition with iris, cedar, and tonka. Reflective and melancholic in a sophisticated way.", notes: ["Iris","Cedar","Tonka Bean","Amber","Vetiver","Musk","Woody Notes"], categories: ["Woody","Oriental","Powdery"], year: 2017, perfumer: null, concentration: "Eau de Parfum" },
+  "Acqua di Cuba": { description: "Santa Maria Novella's Caribbean escape. Tobacco, rum, and tropical woods capture Cuba's spirit. Warm, spicy, and laid-back.", notes: ["Tobacco","Rum","Tropical Woods","Spices","Vanilla","Musk","Amber"], categories: ["Woody","Spicy","Gourmand"], year: null, perfumer: null, concentration: "Eau de Toilette" },
+  "Città di Kyoto": { description: "Santa Maria Novella's tribute to Kyoto. Hinoki wood, green tea, and incense create a serene, contemplative Japanese-inspired composition.", notes: ["Hinoki","Green Tea","Incense","Iris","Sandalwood","Musk","Woody Notes"], categories: ["Woody","Green","Aromatic"], year: null, perfumer: null, concentration: "Eau de Parfum" },
+  "Fieno (Hay)": { description: "Santa Maria Novella captures the scent of fresh-cut Italian hay. Coumarin, green herbs, and a warm, pastoral sweetness. Simple and evocative.", notes: ["Hay","Coumarin","Green Notes","Herbs","Tonka Bean","Musk"], categories: ["Green","Aromatic","Fresh"], year: null, perfumer: null, concentration: "Eau de Cologne" },
+  "Muschio Oro": { description: "Golden musk from Santa Maria Novella. A warm, precious musk composition with amber and sandalwood. Intimate and quietly luxurious.", notes: ["Musk","Amber","Sandalwood","Vanilla","Woody Notes"], categories: ["Musky","Oriental","Woody"], year: null, perfumer: null, concentration: "Eau de Parfum" },
+  "Sandalo": { description: "Santa Maria Novella's classic sandalwood. Pure, creamy Indian sandalwood in a traditional Italian formulation. Warm, smooth, and meditative.", notes: ["Sandalwood","Musk","Amber","Woody Notes"], categories: ["Woody","Musky","Oriental"], year: null, perfumer: null, concentration: "Eau de Cologne" },
+  "Nuit de Cellophane": { description: "Serge Lutens's transparent, ethereal composition. White flowers, rice, and osmanthus wrapped in a cellophane-like clarity. Delicate and luminous.", notes: ["Rice","Osmanthus","White Flowers","Musk","Green Tea","Almond"], categories: ["Floral","Fresh","Green"], year: 2006, perfumer: "Christopher Sheldrake", concentration: "Eau de Parfum" },
+  "Vitriol d'œillet": { description: "Serge Lutens's carnation reinvented. A sharp, spicy carnation with clove and pepper, stripped of sweetness. Pungent, elegant, and distinctive.", notes: ["Carnation","Clove","Pepper","Vanilla","Musk","Woody Notes"], categories: ["Spicy","Floral","Aromatic"], year: 2001, perfumer: "Christopher Sheldrake", concentration: "Eau de Parfum" },
+  "Au Coeur du Désert": { description: "Tauer Perfumes' extrait version of L'Air du Désert Marocain. Concentrated desert heat — resins, spices, and dry woods. Andy Tauer's masterwork intensified.", notes: ["Frankincense","Cade","Vetiver","Amber","Spices","Dried Fruits","Tolu Balsam"], categories: ["Oriental","Woody","Spicy"], year: 2013, perfumer: "Andy Tauer", concentration: "Extrait de Parfum" },
+  "Indian Jasmine": { description: "The Merchant of Venice's opulent jasmine. Indian jasmine sambac in a rich, golden composition with sandalwood and amber.", notes: ["Jasmine Sambac","Sandalwood","Amber","Musk","Vanilla","Saffron"], categories: ["Floral","Oriental","Sweet"], year: null, perfumer: null, concentration: "Eau de Parfum" },
+  "Coffee Addict": { description: "Theodoros Kalotinis's unabashed coffee fragrance. Rich, dark espresso with vanilla and tonka. For people who want to smell like their morning ritual.", notes: ["Coffee","Vanilla","Tonka Bean","Chocolate","Caramel","Musk","Amber"], categories: ["Gourmand","Oriental","Sweet"], year: 2020, perfumer: "Theodoros Kalotinis", concentration: "Eau de Parfum" },
+  "Vachetta": { description: "Tom Daxon's tribute to Tuscan vachetta leather. A refined, quiet leather with iris, suede, and warm woods. Understated and elegant.", notes: ["Leather","Iris","Suede","Cedar","Musk","Amber","Violet"], categories: ["Leather","Woody","Powdery"], year: 2016, perfumer: "Tom Daxon", concentration: "Eau de Parfum" },
+  "Eau de Soleil Blanc": { description: "Tom Ford's luminous summer fragrance. Bitter orange, bergamot, and tuberose over a creamy amber-musk base. Sun-drenched and effortlessly luxurious.", notes: ["Bitter Orange","Bergamot","Tuberose","Amber","White Musk","Coconut","Pink Pepper"], categories: ["Fresh","Citrus","Floral"], year: 2017, perfumer: null, concentration: "Eau de Toilette" },
+  "Tobacco Vanille": { description: "Tom Ford's opulent take on an English gentleman's club. Rich, sweet tobacco leaf and aromatic spices meld into a warm vanilla and cocoa base. A pillar of the Private Blend collection.", notes: ["Tobacco Leaf","Spicy Notes","Tonka Bean","Vanilla","Cocoa","Ginger","Dried Fruits","Wood Sap"], categories: ["Oriental","Gourmand","Spicy"], year: 2007, perfumer: "Olivier Gillotin", concentration: "Eau de Parfum" },
+  "Swiss Army": { description: "The original Victorinox Swiss Army fragrance. A clean, herbal-citrus composition with birch, oakmoss, and a hint of sweetness. Straightforward and outdoorsy.", notes: ["Birch","Bergamot","Oakmoss","Herbs","Cedar","Musk","Amber"], categories: ["Aromatic","Green","Fresh"], year: 1996, perfumer: null, concentration: "Eau de Toilette" },
+  "Vibrant Leather Eau de Parfum": { description: "Zara's widely praised leather fragrance, often compared to Aventus. A fresh, leathery composition with violet leaf and woody notes at a fraction of niche pricing.", notes: ["Violet Leaf","Leather","Woody Notes","Musk","Amber","Lavender"], categories: ["Leather","Fresh","Woody"], year: 2018, perfumer: "Alberto Morillas", concentration: "Eau de Parfum" },
+  "Hummingbird": { description: "Zoologist's tribute to the iridescent bird. A sparkling, nectar-like floral balancing tropical sweetness with herbal freshness. Bright, joyful, darting — it captures the restless energy of its namesake.", notes: ["Bergamot","Green Notes","Honeysuckle","Frangipani","Ylang-Ylang","Orchid","Sandalwood","Musk","Benzoin"], categories: ["Floral","Tropical","Sweet"], year: 2019, perfumer: "Cristiano Canali", concentration: "Eau de Parfum" },
+  "Oyedo Eau de Toilette": { description: "Diptyque's sparkling citrus. Yuzu, mandarin, and pink pepper over a thyme and cedar base. Bright, effervescent, and unmistakably Diptyque.", notes: ["Yuzu","Mandarin","Pink Pepper","Thyme","Cedar","Musk","Patchouli"], categories: ["Citrus","Fresh","Spicy"], year: 2000, perfumer: null, concentration: "Eau de Toilette" },
+  "Ambra Calabria": { description: "Nishane's amber from Calabria. A warm, resinous amber with Italian bergamot and citrus brightness. Southern Italian warmth in concentrated form.", notes: ["Amber","Bergamot","Citrus","Vanilla","Benzoin","Musk","Woody Notes"], categories: ["Amber","Oriental","Citrus"], year: 2019, perfumer: null, concentration: "Extrait de Parfum" },
+  "Hacivat": { description: "Named after a Turkish shadow puppet character. A fresh, fruity-woody composition balancing pineapple and grapefruit with patchouli, sandalwood, and oakmoss.", notes: ["Pineapple","Grapefruit","Bergamot","Jasmine","Patchouli","Sandalwood","Oakmoss","Cedar","Musk"], categories: ["Woody","Fresh","Fruity"], year: 2017, perfumer: "Jorge Lee", concentration: "Eau de Parfum" },
+  "Delicious Rhubarb & Rose Eau de Parfum": { description: "Molton Brown's bright, tart-sweet pairing of rhubarb and rose. A fresh, British garden scent with a modern edge. Pink pepper adds gentle warmth.", notes: ["Rhubarb","Rose","Pink Pepper","Geranium","Musk","Amber","Cedar"], categories: ["Floral","Fresh","Fruity"], year: 2019, perfumer: null, concentration: "Eau de Parfum" }
+};
+
+const ALL_CATEGORIES = ["Woody","Floral","Oriental","Fresh","Aromatic","Spicy","Gourmand","Leather","Fougère","Citrus","Green","Aquatic","Smoky","Amber","Fruity","Powdery","Earthy","Tropical","Sweet","Musky"];
+
+const SEASON_MAP = {
+  spring: ["Fresh","Floral","Green","Citrus","Aromatic"],
+  summer: ["Fresh","Citrus","Aquatic","Tropical","Fruity"],
+  autumn: ["Woody","Spicy","Gourmand","Oriental","Smoky","Leather"],
+  winter: ["Oriental","Gourmand","Smoky","Amber","Woody","Leather","Spicy"]
+};
+
+const BASE_PERFUMES = [
+  {id:1,name:"Peau Santal",house:"Miller Harris"},{id:2,name:"Secret Gardenia",house:"Miller Harris"},{id:3,name:"Tobacolor",house:"Dior"},{id:4,name:"Captured By Candlelight",house:"4160 Tuesdays"},{id:5,name:"Doe In The Snow",house:"4160 Tuesdays"},{id:6,name:"The Sexiest Scent on the Planet. Ever. IMHO",house:"4160 Tuesdays"},{id:7,name:"The Waft From The Loft",house:"4160 Tuesdays"},{id:8,name:"Blu Mediterraneo - Fico di Amalfi",house:"Acqua di Parma"},{id:9,name:"Blu Mediterraneo - Mandorlo di Sicilia",house:"Acqua di Parma"},{id:10,name:"Colonia Sandalo Concentrée",house:"Acqua di Parma"},{id:11,name:"Sakura Eau de Parfum",house:"Acqua di Parma"},{id:12,name:"Orange Sanguine",house:"Atelier Cologne"},{id:13,name:"Lavender on the Rocks",house:"Atkinsons"},{id:14,name:"17 Oud Mosaic",house:"Banana Republic"},{id:15,name:"78 Vintage Green",house:"Banana Republic"},{id:16,name:"Cordovan",house:"Banana Republic"},{id:17,name:"Slate",house:"Banana Republic"},{id:18,name:"My Burberry Blush",house:"Burberry"},{id:19,name:"Botafumeiro",house:"Carner Barcelona"},{id:20,name:"Ligea (Ligea la Sirena)",house:"Carthusia"},{id:21,name:"Balade Sauvage",house:"Dior"},{id:22,name:"Jasmin Des Anges",house:"Dior"},{id:23,name:"EIGHT & BOB",house:"EIGHT & BOB"},{id:24,name:"Jardin du Poete",house:"Eau D'Italie"},{id:25,name:"Rosa Greta",house:"Eau D'Italie"},{id:26,name:"Archives 69",house:"Etat Libre d'Orange"},{id:27,name:"Cologne",house:"Etat Libre d'Orange"},{id:28,name:"Dangerous Complicity",house:"Etat Libre d'Orange"},{id:29,name:"Divin Enfant",house:"Etat Libre d'Orange"},{id:30,name:"Exit The King",house:"Etat Libre d'Orange"},{id:31,name:"Fat Electrician Semi Modern Vetiver",house:"Etat Libre d'Orange"},{id:32,name:"Fils de Dieu du riz et des agrumes",house:"Etat Libre d'Orange"},{id:33,name:"Hermann a mes Cotes me Paraissait une Ombre",house:"Etat Libre d'Orange"},{id:34,name:"Jasmin et Cigarette",house:"Etat Libre d'Orange"},{id:35,name:"Noel au Balcon",house:"Etat Libre d'Orange"},{id:36,name:"Remarkable People",house:"Etat Libre d'Orange"},{id:37,name:"Rien Intense Incense",house:"Etat Libre d'Orange"},{id:38,name:"Tilda Swinton Like This",house:"Etat Libre d'Orange"},{id:39,name:"Tom of Finland",house:"Etat Libre d'Orange"},{id:40,name:"Vierges et Toreros",house:"Etat Libre d'Orange"},{id:41,name:"Neon Rose",house:"Floral Street"},{id:42,name:"Ylang-Ylang Espresso",house:"Floral Street"},{id:43,name:"1976",house:"Floris"},{id:44,name:"1988",house:"Floris"},{id:45,name:"Bouquet de La Reine",house:"Floris"},{id:46,name:"Cefiro",house:"Floris"},{id:47,name:"Eau de Santal",house:"Floris"},{id:48,name:"Elite",house:"Floris"},{id:49,name:"Fleur",house:"Floris"},{id:50,name:"JF",house:"Floris"},{id:51,name:"Leather Oud",house:"Floris"},{id:52,name:"Night Scented Jasmine",house:"Floris"},{id:53,name:"Royal Arms Diamond Edition",house:"Floris"},{id:54,name:"Seringa",house:"Floris"},{id:55,name:"White Rose",house:"Floris"},{id:56,name:"Zinnia",house:"Floris"},{id:57,name:"The Orchid Man",house:"Frapin"},{id:58,name:"Outrageous!",house:"Frederic Malle"},{id:59,name:"Acqua di Gio",house:"Giorgio Armani"},{id:60,name:"Pi",house:"Givenchy"},{id:61,name:"Desert Rosewood",house:"Goldfield & Banks Australia"},{id:62,name:"Bois d'Hadrien",house:"Goutal"},{id:63,name:"Eau De Charlotte",house:"Goutal"},{id:64,name:"Un Matin d'Orage",house:"Goutal"},{id:65,name:"Champs Elysees Eau de Parfum",house:"Guerlain"},{id:66,name:"Habit Rouge Eau de Parfum",house:"Guerlain"},{id:67,name:"Les Absolus d'Orient Santal Royal",house:"Guerlain"},{id:68,name:"Shalimar Eau de Parfum",house:"Guerlain"},{id:69,name:"H24",house:"Hermès"},{id:70,name:"Le Jardin de Monsieur Li",house:"Hermès"},{id:71,name:"Boss Bottled Intense",house:"Hugo Boss"},{id:72,name:"Muschio e Ambra",house:"I Profumi di Firenze"},{id:73,name:"Spezie de Medici",house:"I Profumi di Firenze"},{id:74,name:"Vento di Eros",house:"I Profumi di Firenze"},{id:75,name:"A City On Fire",house:"Imaginary Authors"},{id:76,name:"Cape Heartache",house:"Imaginary Authors"},{id:77,name:"Falling Into The Sea",house:"Imaginary Authors"},{id:78,name:"Memoirs Of A Trespasser",house:"Imaginary Authors"},{id:79,name:"Saint Julep",house:"Imaginary Authors"},{id:80,name:"The Cobra and The Canary",house:"Imaginary Authors"},{id:81,name:"Yesterday Haze",house:"Imaginary Authors"},{id:82,name:"Hinoki",house:"Issey Miyake"},{id:83,name:"Artisan Pure",house:"John Varvatos"},{id:84,name:"Pavillon Rouge",house:"Jovoy Paris"},{id:85,name:"Bois de Vetiver",house:"Karl Lagerfeld"},{id:86,name:"Kashnoir",house:"Laboratorio Olfattivo"},{id:87,name:"Vanagloria",house:"Laboratorio Olfattivo"},{id:88,name:"Encre Noire A L'Extreme",house:"Lalique"},{id:89,name:"Santal 33",house:"Le Labo"},{id:90,name:"Atman Xaman",house:"Lorenzo Villoresi"},{id:91,name:"Aura Maris",house:"Lorenzo Villoresi"},{id:92,name:"Musk",house:"Lorenzo Villoresi"},{id:93,name:"Gin Fizz",house:"Lubin"},{id:94,name:"Aoud",house:"M. Micallef"},{id:95,name:"Avant Garde",house:"M. Micallef"},{id:96,name:"Emir",house:"M. Micallef"},{id:97,name:"Le Barbier de Tanger",house:"MDCI Parfums"},{id:98,name:"Baccarat Rouge 540 Extrait de Parfum",house:"Maison Francis Kurkdjian"},{id:99,name:"By the Fireplace",house:"Maison Martin Margiela"},{id:100,name:"Poom Poom",house:"Maison Matine"},{id:101,name:"Cannabis Eau de Parfum",house:"Malin + Goetz"},{id:102,name:"Black Intensitive Aoud",house:"Mancera"},{id:103,name:"Black to Black",house:"Mancera"},{id:104,name:"Cedrat Boisee",house:"Mancera"},{id:105,name:"Pure Black",house:"Mandarina Duck"},{id:106,name:"Wood and Absinth",house:"Mark Buxton"},{id:107,name:"African Leather",house:"Memo Paris"},{id:108,name:"Granada",house:"Memo Paris"},{id:109,name:"Irish Leather",house:"Memo Paris"},{id:110,name:"Jannat",house:"Memo Paris"},{id:111,name:"Moon Fever",house:"Memo Paris"},{id:112,name:"Shams Oud",house:"Memo Paris"},{id:113,name:"Vadhoo",house:"Memo Paris"},{id:114,name:"Brighton Rock",house:"Miller Harris"},{id:115,name:"La Fumée Alexandrie",house:"Miller Harris"},{id:116,name:"La Fumée Arabie",house:"Miller Harris"},{id:117,name:"Noix de Tubereuse",house:"Miller Harris"},{id:118,name:"Aoud Leather",house:"Montale"},{id:119,name:"Fougères Marines",house:"Montale"},{id:120,name:"Explorer",house:"Montblanc"},{id:121,name:"A*Men Pure Havane",house:"Mugler"},{id:122,name:"Absinth",house:"Nasomatto"},{id:123,name:"Baraonda",house:"Nasomatto"},{id:124,name:"Black Afgano",house:"Nasomatto"},{id:125,name:"Blamage",house:"Nasomatto"},{id:126,name:"Duro",house:"Nasomatto"},{id:127,name:"Narcotic Venus",house:"Nasomatto"},{id:128,name:"Nudiflorum",house:"Nasomatto"},{id:129,name:"Pardon",house:"Nasomatto"},{id:130,name:"Silver Musk",house:"Nasomatto"},{id:131,name:"Kredo",house:"Nishane"},{id:132,name:"Papilefiko",house:"Nishane"},{id:133,name:"Wulóng Chá",house:"Nishane"},{id:134,name:"Flash Back",house:"Olfactive Studio"},{id:135,name:"Champaca",house:"Ormonde Jayne"},{id:136,name:"Sampaquita",house:"Ormonde Jayne"},{id:137,name:"Azur Riviera",house:"Parfums Berdoues"},{id:138,name:"Oud Wa Ward",house:"Parfums Berdoues"},{id:139,name:"Russkaya Kozha",house:"Parfums Berdoues"},{id:140,name:"Selva do Brazil",house:"Parfums Berdoues"},{id:141,name:"Blenheim Bouquet",house:"Penhaligon's"},{id:142,name:"Castile",house:"Penhaligon's"},{id:143,name:"Endymion Concentré",house:"Penhaligon's"},{id:144,name:"Lily of the Valley",house:"Penhaligon's"},{id:145,name:"Lothair",house:"Penhaligon's"},{id:146,name:"Monsieur Beauregard",house:"Penhaligon's"},{id:147,name:"Opus 1870",house:"Penhaligon's"},{id:148,name:"Orange Blossom",house:"Penhaligon's"},{id:149,name:"Sartorial",house:"Penhaligon's"},{id:150,name:"The Ingenue Cousin Flora",house:"Penhaligon's"},{id:151,name:"The Tragedy of Lord George",house:"Penhaligon's"},{id:152,name:"Luna Rossa",house:"Prada"},{id:153,name:"Luna Rossa Carbon Eau de Toilette",house:"Prada"},{id:154,name:"Prada Amber Pour Homme (Prada Man)",house:"Prada"},{id:155,name:"Polo Blue",house:"Ralph Lauren"},{id:156,name:"Eau de Rochas Homme",house:"Rochas"},{id:157,name:"Le Temps Perdu",house:"Salle Privée"},{id:158,name:"Acqua di Cuba",house:"Santa Maria Novella"},{id:159,name:"Città di Kyoto",house:"Santa Maria Novella"},{id:160,name:"Fieno (Hay)",house:"Santa Maria Novella"},{id:161,name:"Muschio Oro",house:"Santa Maria Novella"},{id:162,name:"Sandalo",house:"Santa Maria Novella"},{id:163,name:"Nuit de Cellophane",house:"Serge Lutens"},{id:164,name:"Vitriol d'œillet",house:"Serge Lutens"},{id:165,name:"Au Coeur du Désert",house:"Tauer Perfumes"},{id:166,name:"Indian Jasmine",house:"The Merchant of Venice"},{id:167,name:"Coffee Addict",house:"Theodoros Kalotinis"},{id:168,name:"Vachetta",house:"Tom Daxon"},{id:169,name:"Eau de Soleil Blanc",house:"Tom Ford"},{id:170,name:"Tobacco Vanille",house:"Tom Ford"},{id:171,name:"Swiss Army",house:"Victorinox Swiss Army"},{id:172,name:"Vibrant Leather Eau de Parfum",house:"Zara"},{id:173,name:"Hummingbird",house:"Zoologist Perfumes"},{id:174,name:"Oyedo Eau de Toilette",house:"Diptyque"},{id:175,name:"Ambra Calabria",house:"Nishane"},{id:176,name:"Hacivat",house:"Nishane"},{id:177,name:"Delicious Rhubarb & Rose Eau de Parfum",house:"Molton Brown"}
+];
+
+// Utility functions
+function getSeason() {
+  const m = new Date().getMonth();
+  if (m >= 2 && m <= 4) return "spring";
+  if (m >= 5 && m <= 7) return "summer";
+  if (m >= 8 && m <= 10) return "autumn";
+  return "winter";
+}
+function seededRandom(seed) { let x = Math.sin(seed) * 10000; return x - Math.floor(x); }
+function getDayOfYear() { const now = new Date(); return Math.floor((now - new Date(now.getFullYear(),0,0)) / 86400000); }
+
+// Storage helpers (localStorage instead of window.storage)
+const SK = "fragrance-collection-v1";
+const store = {
+  get: (key) => { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch { return null; } },
+  set: (key, val) => { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
+};
+
+// Always use light theme
+const isDark = () => false;
+
+// ─── Supabase helpers ────────────────────────────────────────────────────────
+
+function getClient() {
+  const url = localStorage.getItem('supabase-url');
+  const key = localStorage.getItem('supabase-anon-key');
+  if (!url || !key) return null;
+  return window.supabase.createClient(url, key);
+}
+
+function rowToPerfume(row, logs = []) {
+  return {
+    id: row.id, name: row.name, house: row.house,
+    description: row.description || '', notes: row.notes || [],
+    categories: row.categories || [], year: row.year,
+    perfumer: row.perfumer, concentration: row.concentration,
+    photoUrl: row.photo_url, enriched: row.enriched || false,
+    archived: row.archived || false, archiveReason: row.archive_reason,
+    archivedAt: row.archived_at, lastUsed: row.last_used,
+    rating: row.rating || null, personalNotes: row.personal_notes || [],
+    usageHistory: logs
+      .filter(l => l.perfume_id === row.id)
+      .sort((a, b) => a.logged_at.localeCompare(b.logged_at))
+      .map(l => ({ who: l.who, date: l.logged_at, logId: l.id }))
+  };
+}
+
+function perfumeToRow(p) {
+  return {
+    id: p.id, name: p.name, house: p.house,
+    description: p.description || null, notes: p.notes || [],
+    categories: p.categories || [], year: p.year || null,
+    perfumer: p.perfumer || null, concentration: p.concentration || null,
+    photo_url: p.photoUrl || null, enriched: p.enriched || false,
+    archived: p.archived || false, archive_reason: p.archiveReason || null,
+    archived_at: p.archivedAt || null, last_used: p.lastUsed || null,
+    rating: p.rating || null, personal_notes: p.personalNotes || [],
+    updated_at: new Date().toISOString()
+  };
+}
+
+async function loadFromSupabase() {
+  const sb = getClient(); if (!sb) return null;
+  const [{ data: rows, error: e1 }, { data: logs, error: e2 }] = await Promise.all([
+    sb.from('perfumes').select('*'),
+    sb.from('spray_logs').select('*').order('logged_at', { ascending: true })
+  ]);
+  if (e1 || e2) { console.error('Supabase load error', e1, e2); return null; }
+  return rows.map(r => rowToPerfume(r, logs || []));
+}
+
+async function upsertPerfume(p) {
+  const sb = getClient(); if (!sb) return;
+  const { error } = await sb.from('perfumes').upsert(perfumeToRow(p));
+  if (error) console.error('Supabase upsert error', error);
+}
+
+async function insertPerfumeToDb(p) {
+  const sb = getClient(); if (!sb) return;
+  const row = perfumeToRow(p); delete row.updated_at;
+  const { error } = await sb.from('perfumes').insert(row);
+  if (error) console.error('Supabase insert error', error);
+}
+
+async function logSprayToDb(perfumeId, who) {
+  const sb = getClient(); if (!sb) return null;
+  const now = new Date().toISOString();
+  const { data, error } = await sb.from('spray_logs')
+    .insert({ perfume_id: perfumeId, who, logged_at: now })
+    .select().single();
+  if (error) { console.error('Supabase spray error', error); return null; }
+  await sb.from('perfumes').update({ last_used: now, updated_at: now }).eq('id', perfumeId);
+  return data;
+}
+
+async function deletePerfumeFromDb(pid) {
+  const sb = getClient(); if (!sb) return;
+  await sb.from('spray_logs').delete().eq('perfume_id', pid);
+  const { error } = await sb.from('perfumes').delete().eq('id', pid);
+  if (error) console.error('Supabase delete error', error);
+}
+
+async function removeSprayFromDb(logId, perfumeId) {
+  const sb = getClient(); if (!sb) return null;
+  await sb.from('spray_logs').delete().eq('id', logId);
+  const { data: remaining } = await sb.from('spray_logs')
+    .select('logged_at').eq('perfume_id', perfumeId)
+    .order('logged_at', { ascending: false }).limit(1);
+  const lastUsed = remaining && remaining.length ? remaining[0].logged_at : null;
+  await sb.from('perfumes').update({ last_used: lastUsed, updated_at: new Date().toISOString() }).eq('id', perfumeId);
+  return lastUsed;
+}
+
+async function migrateToSupabase(perfumes) {
+  const sb = getClient(); if (!sb) return false;
+  const { count, error: ce } = await sb.from('perfumes').select('*', { count: 'exact', head: true });
+  if (ce) { console.error('Migration count error', ce); return false; }
+  if (count > 0) return true;
+  // Insert in batches of 25 to avoid request size limits
+  const BATCH = 25;
+  const rows = perfumes.map(perfumeToRow);
+  for (let i = 0; i < rows.length; i += BATCH) {
+    const { error } = await sb.from('perfumes').insert(rows.slice(i, i + BATCH));
+    if (error) { console.error('Migration batch error at', i, error); return false; }
+  }
+  const logs = perfumes.flatMap(p => (p.usageHistory || []).map(h => ({
+    perfume_id: p.id, who: h.who, logged_at: h.date
+  })));
+  for (let i = 0; i < logs.length; i += BATCH) {
+    const { error } = await sb.from('spray_logs').insert(logs.slice(i, i + BATCH));
+    if (error) { console.error('Migration logs batch error at', i, error); return false; }
+  }
+  return true;
+}
+
+function App() {
+  const [profile, setProfile] = useState(localStorage.getItem("fragrance-profile") || null);
+  const [perfumes, setPerfumes] = useState([]);
+  const [search, setSearch] = useState("");
+  const [catFilter, setCatFilter] = useState("All");
+  const [houseFilter, setHouseFilter] = useState("All");
+  const [selected, setSelected] = useState(null);
+  const [dailyMode, setDailyMode] = useState("random");
+  const [dailyPick, setDailyPick] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archiveModal, setArchiveModal] = useState(null);
+  const [archiveReason, setArchiveReason] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [noteInput, setNoteInput] = useState("");
+  const [sortBy, setSortBy] = useState("name-az");
+  const [showDailyPop, setShowDailyPop] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [apiKey, setApiKey] = useState(localStorage.getItem("anthropic-key") || "");
+  const [bingApiKey, setBingApiKey] = useState(localStorage.getItem("bing-api-key") || "");
+  const [supabaseUrl, setSupabaseUrl] = useState(localStorage.getItem("supabase-url") || "");
+  const [supabaseKey, setSupabaseKey] = useState(localStorage.getItem("supabase-anon-key") || "");
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState(null); // null | "ok" | "error"
+  const fileRef = useRef(null);
+  const [enriching, setEnriching] = useState(null);
+  const [showChat, setShowChat] = useState(false);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatEndRef = useRef(null);
+
+  // Online / offline detection
+  useEffect(() => {
+    const go = () => setIsOnline(true);
+    const stop = () => setIsOnline(false);
+    window.addEventListener('online', go);
+    window.addEventListener('offline', stop);
+    return () => { window.removeEventListener('online', go); window.removeEventListener('offline', stop); };
+  }, []);
+
+  // Back button / swipe gesture support
+  const openDetail = (p) => { setSelected(p); window.history.pushState({ type: 'detail' }, ''); };
+  const openSettings = () => { setShowSettings(true); window.history.pushState({ type: 'settings' }, ''); };
+  const openAdd = () => { setShowAdd(true); window.history.pushState({ type: 'add' }, ''); };
+  const openArchiveModal = (p) => { setArchiveModal(p); setArchiveReason(""); window.history.pushState({ type: 'archive' }, ''); };
+
+  useEffect(() => {
+    const handlePop = () => {
+      if (archiveModal) { setArchiveModal(null); setArchiveReason(""); }
+      else if (showSettings) setShowSettings(false);
+      else if (showAdd) setShowAdd(false);
+      else if (selected) { setSelected(null); setPhotoSearch({ loading: false, results: [], forId: null }); }
+    };
+    window.addEventListener('popstate', handlePop);
+    return () => window.removeEventListener('popstate', handlePop);
+  }, [selected, showSettings, showAdd, archiveModal]);
+
+  const saveApiKey = (k) => { setApiKey(k); localStorage.setItem("anthropic-key", k); };
+  const saveBingApiKey = (k) => { setBingApiKey(k); localStorage.setItem("bing-api-key", k); };
+  const saveSupabaseUrl = (v) => { setSupabaseUrl(v); localStorage.setItem("supabase-url", v); };
+  const saveSupabaseKey = (v) => { setSupabaseKey(v); localStorage.setItem("supabase-anon-key", v); };
+  const supabaseConfigured = !!(supabaseUrl && supabaseKey);
+  const canWrite = !supabaseConfigured || isOnline;
+  const [photoSearch, setPhotoSearch] = useState({ loading: false, results: [], forId: null });
+  const [enrichingForm, setEnrichingForm] = useState(false);
+  const [enrichError, setEnrichError] = useState(null);
+  const [form, setForm] = useState({ name:"",house:"",description:"",notes:"",categories:[],year:"",perfumer:"",concentration:"",photoUrl:"" });
+
+  const enrichForm = async () => {
+    if (!form.name.trim() || !form.house.trim()) return;
+    if (!apiKey) { setShowSettings(true); return; }
+    setEnrichingForm(true);
+    setEnrichError(null);
+    try {
+      const data = await apiCall([{ role: "user", content: `Search for the perfume "${form.name.trim()}" by "${form.house.trim()}". Return ONLY a JSON object: {"description":"2-3 sentences","notes":["array"],"categories":["2-3 from: Woody, Floral, Oriental, Fresh, Aromatic, Spicy, Gourmand, Leather, Fougère, Citrus, Green, Aquatic, Smoky, Amber, Fruity, Powdery, Earthy, Tropical, Sweet, Musky"],"year":2020,"perfumer":"Name or null","concentration":"EDP/EDT/etc"} No other text.` }]);
+      if (!data || !data.content) {
+        const detail = data?.error?.message || data?.message || JSON.stringify(data);
+        setEnrichError("API error: " + detail);
+        setEnrichingForm(false); return;
+      }
+      const text = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("\n");
+      const m = text.match(/\{[\s\S]*\}/);
+      if (m) {
+        const p = JSON.parse(m[0]);
+        setForm(prev => ({
+          ...prev,
+          description: p.description || prev.description,
+          notes: Array.isArray(p.notes) ? p.notes.join(", ") : prev.notes,
+          categories: Array.isArray(p.categories) ? p.categories : prev.categories,
+          year: p.year ? String(p.year) : prev.year,
+          perfumer: p.perfumer || prev.perfumer,
+          concentration: p.concentration || prev.concentration
+        }));
+      } else {
+        setEnrichError("No data returned. Try a different name or house spelling.");
+      }
+    } catch (err) { console.error("Form enrichment failed:", err); setEnrichError("Something went wrong. Check console for details."); }
+    setEnrichingForm(false);
+  };
+  const dark = isDark();
+
+  const apiCall = async (messages) => {
+    if (!apiKey) return null;
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1000, messages })
+    });
+    return r.json();
+  };
+
+  const chatCall = async (messages) => {
+    if (!apiKey) return null;
+    const library = perfumes.filter(p => !p.archived).map(p => ({
+      name: p.name, house: p.house,
+      notes: p.notes || [],
+      categories: p.categories || [],
+      description: p.description || ""
+    }));
+    const sys = `You are a personal fragrance advisor for ${profile}. Your job is to ask 2-3 focused questions about mood, occasion, time of day, season, or note preferences, then recommend 1-3 perfumes exclusively from the library below. Recommend ONLY from this list — never suggest something not in it. Keep responses concise and direct. No emoji. Address the user as ${profile}. If the user asks about a perfume not in the library, acknowledge it and redirect to what is available.
+
+Active library (${library.length} perfumes):
+${JSON.stringify(library)}`;
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 600, system: sys, messages })
+    });
+    return r.json();
+  };
+
+  const sendChat = async () => {
+    const text = chatInput.trim();
+    if (!text || chatLoading) return;
+    if (!apiKey) { setShowChat(false); setShowSettings(true); return; }
+    const newMessages = [...chatMessages, { role: "user", content: text }];
+    setChatMessages(newMessages);
+    setChatInput("");
+    setChatLoading(true);
+    try {
+      const data = await chatCall(newMessages);
+      const reply = (data?.content || []).filter(b => b.type === "text").map(b => b.text).join("\n");
+      if (reply) setChatMessages(prev => [...prev, { role: "assistant", content: reply }]);
+    } catch(err) { console.error("Chat error:", err); }
+    setChatLoading(false);
+  };
+
+  useEffect(() => {
+    if (showChat) chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages, chatLoading, showChat]);
+
+  const enrichPerfume = async (p) => {
+    if (!apiKey) { setShowSettings(true); return; }
+    setEnriching(p.id);
+    try {
+      const data = await apiCall([{ role: "user", content: `Search for the perfume "${p.name}" by "${p.house}". Return ONLY a JSON object: {"description":"2-3 sentences","notes":["array"],"categories":["2-3 from: Woody, Floral, Oriental, Fresh, Aromatic, Spicy, Gourmand, Leather, Fougère, Citrus, Green, Aquatic, Smoky, Amber, Fruity, Powdery, Earthy, Tropical, Sweet, Musky"],"year":2020,"perfumer":"Name or null","concentration":"EDP/EDT/etc"} No other text.` }]);
+      const text = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("\n");
+      const m = text.match(/\{[\s\S]*\}/);
+      if (m) {
+        const parsed = JSON.parse(m[0]);
+        const updated = { ...p, description: parsed.description||p.description, notes: Array.isArray(parsed.notes)?parsed.notes:p.notes, categories: Array.isArray(parsed.categories)?parsed.categories:p.categories, year: parsed.year||p.year, perfumer: parsed.perfumer||p.perfumer, concentration: parsed.concentration||p.concentration, enriched: true };
+        setPerfumes(prev => prev.map(x => x.id === p.id ? updated : x));
+        setSelected(updated);
+        if (supabaseConfigured && isOnline) await upsertPerfume(updated);
+      }
+    } catch (err) { console.error("Enrichment failed:", err); }
+    setEnriching(null);
+  };
+
+  const searchPhotos = (p) => {
+    setPhotoSearch({ loading: false, results: [], error: null, forId: p.id });
+  };
+
+  const searchPhotosByUrl = (pid, fragrancticaUrl) => {
+    const match = fragrancticaUrl.match(/-(\d{3,6})\.html/);
+    if (match) {
+      const url = `https://fimgs.net/mdimg/perfume/375x500.${match[1]}.jpg`;
+      setPhotoSearch(prev => ({ ...prev, results: [url], error: null }));
+    } else {
+      setPhotoSearch(prev => ({ ...prev, error: "Could not extract ID from that URL. Make sure it is a full Fragrantica perfume page URL." }));
+    }
+  };
+
+  const selectPhoto = async (pid, url) => {
+    const perfume = perfumes.find(p => p.id === pid);
+    if (perfume && supabaseConfigured && isOnline) await upsertPerfume({ ...perfume, photoUrl: url });
+    setPerfumes(prev => prev.map(p => p.id === pid ? { ...p, photoUrl: url } : p));
+    if (selected?.id === pid) setSelected(prev => ({ ...prev, photoUrl: url }));
+    setPhotoSearch({ loading: false, results: [], forId: null });
+  };
+
+  // Load data
+  useEffect(() => {
+    async function load() {
+      const sb = getClient();
+      if (sb && navigator.onLine) {
+        setIsSyncing(true);
+        try {
+          let data = await loadFromSupabase();
+          if (data !== null) {
+            if (data.length === 0) {
+              // First run: use localStorage if it looks intact, else re-seed from BASE_PERFUMES
+              const localData = store.get(SK);
+              const fullSeed = BASE_PERFUMES.map(p => {
+                const e = ENRICHED_DATA[p.name];
+                return e ? {...p,...e,enriched:true,usageHistory:[]} : {...p,description:"",notes:[],categories:[],enriched:false,usageHistory:[]};
+              });
+              const seed = (localData && localData.length >= BASE_PERFUMES.length) ? localData : fullSeed;
+              const ok = await migrateToSupabase(seed);
+              if (ok) data = await loadFromSupabase(); else data = seed;
+            }
+            setPerfumes(data);
+            store.set(SK, data);
+            setSyncStatus("ok");
+          } else {
+            // Supabase unreachable — fall back to localStorage cache
+            const cached = store.get(SK);
+            if (cached) setPerfumes(cached);
+            setSyncStatus("error");
+          }
+        } catch(err) {
+          console.error("Load error", err);
+          const cached = store.get(SK);
+          if (cached) setPerfumes(cached);
+          setSyncStatus("error");
+        } finally { setIsSyncing(false); }
+      } else {
+        // No Supabase configured, or offline: load from localStorage
+        let data = store.get(SK);
+        if (!data) {
+          data = BASE_PERFUMES.map(p => {
+            const e = ENRICHED_DATA[p.name];
+            return e ? {...p,...e,enriched:true,usageHistory:[]} : {...p,description:"",notes:[],categories:[],enriched:false,usageHistory:[]};
+          });
+          store.set(SK, data);
+        }
+        setPerfumes(data);
+      }
+      setReady(true);
+    }
+    load();
+  }, []);
+
+  // Save on change
+  useEffect(() => {
+    if (!ready || !perfumes.length) return;
+    store.set(SK, perfumes);
+  }, [perfumes, ready]);
+
+  // Daily pick
+  useEffect(() => {
+    if (!perfumes.length) return;
+    const day = getDayOfYear();
+    const active = perfumes.filter(p => !p.archived);
+    let pool = active, reason = "Random pick of the day";
+    if (dailyMode === "seasonal") {
+      const s = getSeason(), cats = SEASON_MAP[s];
+      const sp = active.filter(p => p.categories?.some(c => cats.includes(c)));
+      if (sp.length) { pool = sp; reason = `Picked for ${s}`; }
+    }
+    if (pool.length) setDailyPick({ ...pool[Math.floor(seededRandom(day * (dailyMode === "seasonal" ? 7 : 13) + 1) * pool.length)], reason });
+  }, [perfumes, dailyMode]);
+
+  const activePerfumes = perfumes.filter(p => showArchived ? p.archived : !p.archived);
+  const houses = ["All", ...Array.from(new Set(activePerfumes.map(p => p.house))).sort()];
+  const cats = ["All", ...Array.from(new Set(activePerfumes.flatMap(p => p.categories || []))).sort()];
+
+  const filtered = activePerfumes.filter(p => {
+    const q = search.toLowerCase();
+    const ms = !q || p.name.toLowerCase().includes(q) || p.house.toLowerCase().includes(q) || (p.notes||[]).some(n => n.toLowerCase().includes(q));
+    return ms && (catFilter === "All" || (p.categories||[]).includes(catFilter)) && (houseFilter === "All" || p.house === houseFilter);
+  });
+
+  const sorted = [...filtered].sort((a, b) => {
+    switch (sortBy) {
+      case "name-az": return a.name.localeCompare(b.name);
+      case "name-za": return b.name.localeCompare(a.name);
+      case "house-az": return a.house.localeCompare(b.house) || a.name.localeCompare(b.name);
+      case "recently-used": return (b.lastUsed || "").localeCompare(a.lastUsed || "");
+      case "least-used": { const aU=a.lastUsed||"",bU=b.lastUsed||""; if(!aU&&!bU)return a.name.localeCompare(b.name); if(!aU)return -1; if(!bU)return 1; return aU.localeCompare(bU); }
+      case "never-used": return (a.lastUsed?1:0)-(b.lastUsed?1:0)||a.name.localeCompare(b.name);
+      default: return 0;
+    }
+  });
+
+  const archiveCount = perfumes.filter(p => p.archived).length;
+  const activeCount = perfumes.filter(p => !p.archived).length;
+
+  const sprayToday = async (pid) => {
+    if (!canWrite) return;
+    const now = new Date().toISOString();
+    let logId = null;
+    if (supabaseConfigured && isOnline) {
+      const logRow = await logSprayToDb(pid, profile);
+      if (logRow) logId = logRow.id;
+    }
+    const entry = { who: profile, date: now, logId };
+    setPerfumes(prev => prev.map(p => {
+      if (p.id !== pid) return p;
+      const history = [...(p.usageHistory || []), entry];
+      return { ...p, lastUsed: now, usageHistory: history };
+    }));
+    if (selected?.id === pid) setSelected(prev => {
+      const history = [...(prev.usageHistory || []), entry];
+      return { ...prev, lastUsed: now, usageHistory: history };
+    });
+  };
+
+  const removeHistory = async (pid, idx) => {
+    if (!canWrite) return;
+    const perfume = perfumes.find(p => p.id === pid);
+    const entry = perfume?.usageHistory?.[idx];
+    if (supabaseConfigured && isOnline && entry?.logId) {
+      await removeSprayFromDb(entry.logId, pid);
+    }
+    setPerfumes(prev => prev.map(p => {
+      if (p.id !== pid) return p;
+      const history = [...(p.usageHistory || [])];
+      history.splice(idx, 1);
+      const lastUsed = history.length ? history[history.length - 1].date : null;
+      return { ...p, usageHistory: history, lastUsed };
+    }));
+    setSelected(prev => {
+      if (!prev || prev.id !== pid) return prev;
+      const history = [...(prev.usageHistory || [])];
+      history.splice(idx, 1);
+      const lastUsed = history.length ? history[history.length - 1].date : null;
+      return { ...prev, usageHistory: history, lastUsed };
+    });
+  };
+
+  const formatDate = (iso) => {
+    if (!iso) return null;
+    const diff = Math.floor((new Date() - new Date(iso)) / 86400000);
+    if (diff === 0) return "Today"; if (diff === 1) return "Yesterday"; if (diff < 7) return `${diff} days ago`;
+    return new Date(iso).toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric" });
+  };
+
+  const doArchive = async () => {
+    if (!archiveModal || !canWrite) return;
+    const updated = { ...archiveModal, archived: true, archiveReason: archiveReason.trim() || "No reason given", archivedAt: new Date().toISOString() };
+    if (supabaseConfigured && isOnline) await upsertPerfume(updated);
+    setPerfumes(prev => prev.map(p => p.id === archiveModal.id ? updated : p));
+    setSelected(null); setArchiveModal(null); setArchiveReason("");
+    window.history.go(-2); // pop archive modal + detail view history states
+  };
+  const doUnarchive = async (pid) => {
+    if (!canWrite) return;
+    const perfume = perfumes.find(p => p.id === pid);
+    if (!perfume) return;
+    const updated = { ...perfume, archived: false, archiveReason: null, archivedAt: null };
+    if (supabaseConfigured && isOnline) await upsertPerfume(updated);
+    setPerfumes(prev => prev.map(p => p.id === pid ? updated : p));
+  };
+
+  const doDelete = async (pid) => {
+    if (!canWrite) return;
+    if (supabaseConfigured && isOnline) await deletePerfumeFromDb(pid);
+    setPerfumes(prev => prev.filter(p => p.id !== pid));
+    setSelected(null); setShowDeleteConfirm(false);
+    window.history.go(-1);
+  };
+
+  const setRating = async (pid, stars) => {
+    const perfume = perfumes.find(p => p.id === pid);
+    if (!perfume || !canWrite) return;
+    const updated = { ...perfume, rating: perfume.rating === stars ? null : stars };
+    if (supabaseConfigured && isOnline) await upsertPerfume(updated);
+    setPerfumes(prev => prev.map(p => p.id === pid ? updated : p));
+    setSelected(updated);
+  };
+
+  const addNote = async (pid, text) => {
+    if (!text.trim() || !canWrite) return;
+    const perfume = perfumes.find(p => p.id === pid);
+    if (!perfume) return;
+    const entry = { who: profile, text: text.trim(), date: new Date().toISOString() };
+    const updated = { ...perfume, personalNotes: [...(perfume.personalNotes || []), entry] };
+    if (supabaseConfigured && isOnline) await upsertPerfume(updated);
+    setPerfumes(prev => prev.map(p => p.id === pid ? updated : p));
+    setSelected(updated);
+    setNoteInput("");
+  };
+
+  const removeNote = async (pid, idx) => {
+    if (!canWrite) return;
+    const perfume = perfumes.find(p => p.id === pid);
+    if (!perfume) return;
+    const notes = [...(perfume.personalNotes || [])];
+    notes.splice(idx, 1);
+    const updated = { ...perfume, personalNotes: notes };
+    if (supabaseConfigured && isOnline) await upsertPerfume(updated);
+    setPerfumes(prev => prev.map(p => p.id === pid ? updated : p));
+    setSelected(updated);
+  };
+
+  const saveEdit = async () => {
+    if (!form.name.trim() || !form.house.trim() || !canWrite) return;
+    const updated = {
+      ...selected,
+      name: form.name.trim(),
+      house: form.house.trim(),
+      description: form.description.trim(),
+      notes: typeof form.notes === "string" ? form.notes.split(",").map(n => n.trim()).filter(Boolean) : form.notes,
+      categories: form.categories,
+      year: form.year ? parseInt(form.year) : null,
+      perfumer: form.perfumer.trim() || null,
+      concentration: form.concentration.trim() || null,
+    };
+    if (supabaseConfigured && isOnline) await upsertPerfume(updated);
+    setPerfumes(prev => prev.map(p => p.id === updated.id ? updated : p));
+    setSelected(updated);
+    setShowEdit(false);
+  };
+
+  const addPerfume = async () => {
+    if (!form.name.trim() || !form.house.trim() || !canWrite) return;
+    const hasContent = form.description.trim() || form.notes.trim() || form.categories.length;
+    const np = { id: Math.max(0,...perfumes.map(x=>x.id))+1, name:form.name.trim(), house:form.house.trim(), description:form.description.trim(), notes:form.notes.split(",").map(n=>n.trim()).filter(Boolean), categories:form.categories, year:form.year?parseInt(form.year):null, perfumer:form.perfumer.trim()||null, concentration:form.concentration.trim()||null, photoUrl:form.photoUrl||null, enriched: !!hasContent, usageHistory: [], lastUsed: null };
+    if (supabaseConfigured && isOnline) await insertPerfumeToDb(np);
+    setPerfumes(prev => [...prev, np]);
+    setForm({name:"",house:"",description:"",notes:"",categories:[],year:"",perfumer:"",concentration:"",photoUrl:""});
+    setShowAdd(false);
+  };
+
+  const handlePhoto = (e, pid) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = (ev) => {
+      const url = ev.target.result;
+      if (pid === "new") setForm(p => ({...p, photoUrl: url}));
+      else {
+        setPerfumes(prev => {
+          const updated = prev.map(p => p.id === pid ? {...p, photoUrl: url} : p);
+          if (supabaseConfigured && isOnline) {
+            const up = updated.find(p => p.id === pid);
+            if (up) upsertPerfume(up);
+          }
+          return updated;
+        });
+        if (selected?.id === pid) setSelected(prev => ({...prev, photoUrl: url}));
+      }
+    };
+    r.readAsDataURL(f);
+  };
+
+  // Dynamic theme colors
+  // Palette: sage #9ebc9e, light pink #ffcfd2, medium pink #ffafc5, plum #553e4e, magenta #e0479e
+  const palette = ["#9ebc9e","#ffcfd2","#ffafc5","#553e4e","#e0479e"];
+  const pickColor = (str, colors) => colors[Math.abs([...str].reduce((h,c) => (h*31+c.charCodeAt(0))|0, 0)) % colors.length];
+  const placeholderColors = dark ? ["#4a2838","#2e3e30","#3e2838"] : ["#ffcfd2","#e8f0e8","#ffe0ea"];
+  const catColors = dark
+    ? [{bg:"#4a5e4a",color:"#c8e0c8"},{bg:"#5e3e50",color:"#f0c0d8"},{bg:"#3e4a5e",color:"#c0d0e8"},{bg:"#5e4a3e",color:"#e8d0c0"},{bg:"#4a3e5e",color:"#d0c0e8"}]
+    : [{bg:"#9ebc9e",color:"#2a3a2a"},{bg:"#ffafc5",color:"#553e4e"},{bg:"#ffcfd2",color:"#553e4e"},{bg:"#e0d4c8",color:"#553e4e"},{bg:"#c8d8e8",color:"#3a4a5e"}];
+  const pickCat = (cat) => catColors[Math.abs([...cat].reduce((h,c) => (h*31+c.charCodeAt(0))|0, 0)) % catColors.length];
+
+  const t = {
+    bg: dark ? "#2a1e24" : "#ffffff",
+    card: dark ? "#362830" : "#ffffff",
+    cardBorder: dark ? "#6a4858" : "#f0e0e4",
+    text: dark ? "#f5f0f2" : "#2e1e28",
+    textSub: dark ? "#d0c0c8" : "#553e4e",
+    textMuted: dark ? "#907080" : "#86707a",
+    inputBg: dark ? "#2e2228" : "#ffffff",
+    inputBorder: dark ? "#6a4858" : "#c8a0a8",
+    pillBg: dark ? "#4a3038" : "#f5f5f5",
+    bannerBg: dark ? "#4a3040" : "#fff0e8",
+    bannerText: dark ? "#e0479e" : "#a03060",
+    accent: "#e0479e",
+    sage: "#9ebc9e",
+    lightPink: "#ffcfd2",
+    medPink: "#ffafc5",
+    plum: "#553e4e",
+    magenta: "#e0479e",
+    shadow: dark ? "0 2px 8px rgba(0,0,0,.3)" : "0 2px 10px rgba(85,62,78,.12)",
+  };
+
+  const S = {
+    wrap: { maxWidth:480, margin:"0 auto", padding:"0 16px 100px", minHeight:"100vh", background:"#ffffff" },
+    back: { background:"none", border:"none", fontSize:14, cursor:"pointer", color:t.textSub, fontWeight:500, padding:"20px 0 12px", fontFamily:"'DM Sans',sans-serif" },
+    detailCard: { background:t.card, borderRadius:16, padding:24, border:`1px solid ${t.cardBorder}`, boxShadow:t.shadow },
+    dPhotoW: { width:"100%", height:300, borderRadius:12, overflow:"hidden", marginBottom:16, background:"#ffffff", display:"flex", alignItems:"center", justifyContent:"center" },
+    dPhoto: { width:"100%", height:"100%", objectFit:"contain" },
+    dHouse: { fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:1, color:t.textMuted, margin:"0 0 4px" },
+    dName: { fontSize:24, fontWeight:700, lineHeight:1.2, margin:"0 0 12px", color:t.text, fontFamily:"'Cormorant Garamond',Georgia,serif" },
+    pill: { display:"inline-block", fontSize:11, padding:"3px 10px", borderRadius:20, background:t.pillBg, color:t.textSub, fontWeight:500, marginRight:6, marginBottom:6 },
+    catDark: null,
+    dDesc: { fontSize:14, lineHeight:1.65, color:t.textSub, margin:"0 0 20px" },
+    label: { fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:.5, color:t.textMuted, margin:"0 0 8px", display:"block" },
+    note: { display:"inline-block", fontSize:11, padding:"3px 10px", borderRadius:20, border:`1px solid ${t.inputBorder}`, color:t.textSub, fontWeight:500, marginRight:5, marginBottom:5 },
+    banner: { background:t.bannerBg, borderRadius:10, padding:"11px 14px", marginBottom:16, color:t.bannerText, fontSize:13 },
+    btn: { padding:"8px 16px", borderRadius:8, border:`1.5px solid ${t.inputBorder}`, background:t.card, fontSize:12, fontWeight:600, cursor:"pointer", color:t.text, fontFamily:"'DM Sans',sans-serif" },
+    search: { width:"100%", padding:"12px 14px", border:`1.5px solid ${t.inputBorder}`, borderRadius:12, fontSize:14, outline:"none", boxSizing:"border-box", background:t.inputBg, color:t.text, marginBottom:10, fontFamily:"'DM Sans',sans-serif", WebkitAppearance:"none", boxShadow:t.shadow },
+    sel: { flex:1, padding:"10px 10px", border:`1.5px solid ${t.inputBorder}`, borderRadius:10, fontSize:12, background:t.inputBg, color:t.text, outline:"none", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" },
+    grid: { display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))", gap:12 },
+    card: { background:t.card, borderRadius:14, overflow:"hidden", cursor:"pointer", border:`1px solid ${t.cardBorder}`, transition:"transform .15s", position:"relative", boxShadow:t.shadow },
+    cImgW: { width:"100%", height:140, overflow:"hidden" },
+    dailyCard: { background:`linear-gradient(135deg,${t.plum} 0%,${t.magenta} 100%)`, borderRadius:16, padding:24, cursor:"pointer", boxShadow:"0 4px 20px rgba(85,62,78,.3)" },
+    overlay: { position:"fixed", inset:0, background:"rgba(42,30,36,.7)", zIndex:1000, display:"flex", alignItems:"flex-end", justifyContent:"center" },
+    modal: { background:dark?"#362830":"#ffffff", borderRadius:"20px 20px 0 0", width:"100%", maxWidth:480, maxHeight:"85vh", display:"flex", flexDirection:"column", boxShadow:"0 -4px 20px rgba(85,62,78,.2)" },
+    input: { width:"100%", padding:"12px 12px", border:`1.5px solid ${t.inputBorder}`, borderRadius:10, fontSize:14, outline:"none", boxSizing:"border-box", marginBottom:10, background:t.inputBg, color:t.text, fontFamily:"'DM Sans',sans-serif" },
+    spinner: { width:16, height:16, border:"2px solid "+t.inputBorder, borderTopColor:t.accent, borderRadius:"50%", animation:"spin 0.8s linear infinite" },
+  };
+
+  if (!profile) return (
+    <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",flexDirection:"column",gap:24,background:"#ffffff"}}>
+      <h1 style={{fontSize:28,fontWeight:700,color:t.text,fontFamily:"'Cormorant Garamond',Georgia,serif",margin:0}}>Fragrance Collection</h1>
+      <p style={{fontSize:14,color:t.textMuted,margin:0}}>Who's browsing?</p>
+      <div style={{display:"flex",gap:14}}>
+        {["Blaise","Jos"].map(name => (
+          <button key={name} onClick={() => { setProfile(name); localStorage.setItem("fragrance-profile", name); }}
+            style={{padding:"16px 36px",borderRadius:12,border:`2px solid ${t.inputBorder}`,background:t.card,fontSize:16,fontWeight:600,cursor:"pointer",color:t.text,fontFamily:"'Cormorant Garamond',Georgia,serif",boxShadow:t.shadow,transition:"transform .1s"}}
+            onMouseEnter={e=>e.currentTarget.style.transform="scale(1.03)"}
+            onMouseLeave={e=>e.currentTarget.style.transform="none"}>
+            {name}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (!ready) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:"#ffffff"}}><p style={{color:t.textMuted,fontFamily:"'Cormorant Garamond',Georgia,serif"}}>Loading collection...</p></div>;
+
+  // DETAIL VIEW
+  if (selected) {
+    const p = selected;
+    return (
+      <div style={S.wrap}>
+        <button style={S.back} onClick={() => window.history.back()}>← Back</button>
+        <div style={S.detailCard}>
+          {p.photoUrl && <div style={S.dPhotoW}><img src={p.photoUrl} alt="" style={S.dPhoto}/></div>}
+          <p style={S.dHouse}>{p.house}</p>
+          <h1 style={S.dName}>{p.name}</h1>
+          <div style={{marginBottom:12}}>{p.year && <span style={S.pill}>{p.year}</span>}{p.concentration && <span style={S.pill}>{p.concentration}</span>}{p.perfumer && <span style={S.pill}>{p.perfumer}</span>}</div>
+          {(p.categories||[]).length > 0 && <div style={{marginBottom:16}}>{p.categories.map(c => { const cc = pickCat(c); return <span key={c} style={{display:"inline-block",fontSize:11,padding:"4px 12px",borderRadius:20,background:cc.bg,color:cc.color,fontWeight:600,marginRight:6,marginBottom:6}}>{c}</span>; })}</div>}
+
+          {/* Star rating */}
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:18}}>
+            {[1,2,3,4,5].map(star => (
+              <button key={star} onClick={() => setRating(p.id, star)} style={{background:"none",border:"none",cursor:"pointer",padding:2,fontSize:22,lineHeight:1,color:star <= (p.rating||0) ? "#e0479e" : t.inputBorder}}>
+                {star <= (p.rating||0) ? "\u2605" : "\u2606"}
+              </button>
+            ))}
+            {p.rating && <span style={{fontSize:11,color:t.textMuted,marginLeft:4}}>{["","Weak","Below average","Average","Good","Exceptional"][p.rating]}</span>}
+          </div>
+
+          {!p.archived && (
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18,padding:"12px 14px",background:t.pillBg,borderRadius:10}}>
+              <div><p style={{margin:0,fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,color:t.textMuted}}>Last worn</p><p style={{margin:"2px 0 0",fontSize:14,fontWeight:600,color:t.text}}>{formatDate(p.lastUsed) || "Never"}</p></div>
+              <button style={{...S.btn,fontSize:12,padding:"8px 14px",background:canWrite?t.sage:"#e0e0e0",color:canWrite?"#2a3a2a":t.textMuted,border:"none",cursor:canWrite?"pointer":"not-allowed"}} onClick={() => canWrite && sprayToday(p.id)} disabled={!canWrite}>{canWrite ? `${profile} sprayed today` : "Offline"}</button>
+            </div>
+          )}
+
+          {p.description && <p style={S.dDesc}>{p.description}</p>}
+          {(p.notes||[]).length > 0 && <div style={{marginBottom:20}}><span style={S.label}>Notes</span><div>{p.notes.map(n => <span key={n} style={S.note}>{n}</span>)}</div></div>}
+
+          {/* Usage history */}
+          {(p.usageHistory||[]).length > 0 && (
+            <div style={{marginBottom:20}}>
+              <span style={S.label}>Usage History</span>
+              <div style={{borderTop:`1px solid ${t.cardBorder}`,paddingTop:10}}>
+                {[...(p.usageHistory||[])].map((e,i) => [e,i]).reverse().map(([entry, origIdx], dispIdx) => (
+                  <div key={origIdx} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:dispIdx < p.usageHistory.length - 1 ? `1px solid ${t.cardBorder}` : "none"}}>
+                    <span style={{fontSize:13,fontWeight:600,color:t.text}}>{entry.who}</span>
+                    <div style={{display:"flex",alignItems:"center",gap:10}}>
+                      <span style={{fontSize:12,color:t.textMuted}}>{formatDate(entry.date)}</span>
+                      <button onClick={() => removeHistory(p.id, origIdx)} style={{background:"none",border:"none",fontSize:11,color:t.textMuted,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",padding:"2px 6px",borderRadius:4}}>remove</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!p.enriched && <div style={S.banner}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span>Not yet enriched.</span><button style={{...S.btn,fontSize:11,padding:"5px 12px",background:t.bannerText,color:"#fff",border:"none"}} onClick={() => enrichPerfume(p)} disabled={enriching===p.id}>{enriching===p.id?"Enriching...":"Enrich Now"}</button></div></div>}
+
+          {/* Personal notes */}
+          <div style={{marginBottom:20}}>
+            <span style={S.label}>Personal Notes</span>
+            {(p.personalNotes||[]).length > 0 && (
+              <div style={{borderTop:"1px solid "+t.cardBorder,paddingTop:10,marginBottom:12}}>
+                {[...(p.personalNotes||[])].reverse().map((entry, dispIdx) => {
+                  const origIdx = (p.personalNotes.length - 1) - dispIdx;
+                  return (
+                    <div key={origIdx} style={{marginBottom:10,paddingBottom:10,borderBottom:dispIdx < p.personalNotes.length - 1 ? "1px solid "+t.cardBorder : "none"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:4}}>
+                        <span style={{fontSize:12,fontWeight:600,color:t.accent}}>{entry.who}</span>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <span style={{fontSize:11,color:t.textMuted}}>{formatDate(entry.date)}</span>
+                          <button onClick={() => removeNote(p.id, origIdx)} style={{background:"none",border:"none",fontSize:11,color:t.textMuted,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",padding:"2px 6px",borderRadius:4}}>remove</button>
+                        </div>
+                      </div>
+                      <p style={{margin:0,fontSize:13,color:t.text,lineHeight:1.6}}>{entry.text}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <textarea
+              style={{...S.input,minHeight:70,resize:"vertical",marginBottom:6}}
+              placeholder={"Add a note as " + profile + "..."}
+              value={noteInput}
+              onChange={e => setNoteInput(e.target.value)}
+            />
+            <button
+              style={{...S.btn,background:noteInput.trim()?t.plum:"transparent",color:noteInput.trim()?"#fff":t.textMuted,border:"1.5px solid "+(noteInput.trim()?t.plum:t.inputBorder),fontSize:12,padding:"8px 16px"}}
+              onClick={() => addNote(p.id, noteInput)}
+              disabled={!noteInput.trim()}
+            >Add note</button>
+          </div>
+
+          {enriching === p.id && <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}><div style={S.spinner}></div><span style={{fontSize:13,color:t.textSub}}>Searching for fragrance data...</span></div>}
+
+          <div style={{display:"flex",gap:10,marginTop:16,flexWrap:"wrap"}}>
+            <input type="file" accept="image/*" capture="environment" ref={fileRef} style={{display:"none"}} onChange={e => handlePhoto(e, p.id)}/>
+            <button style={S.btn} onClick={() => { setForm({ name:p.name, house:p.house, description:p.description||"", notes:Array.isArray(p.notes)?p.notes.join(", "):"", categories:p.categories||[], year:p.year?String(p.year):"", perfumer:p.perfumer||"", concentration:p.concentration||"" }); setShowEdit(true); }}>Edit</button>
+            <button style={S.btn} onClick={() => fileRef.current?.click()}>{p.photoUrl ? "Change Photo" : "Upload Photo"}</button>
+            <button style={S.btn} onClick={() => searchPhotos(p)} disabled={photoSearch.loading && photoSearch.forId === p.id}>{photoSearch.loading && photoSearch.forId === p.id ? "Searching..." : "Find Photo Online"}</button>
+            {p.enriched && <button style={{...S.btn,color:t.textMuted,borderColor:t.inputBorder}} onClick={() => enrichPerfume(p)} disabled={enriching===p.id}>{enriching===p.id?"Refreshing...":"Re-enrich"}</button>}
+          </div>
+
+          {photoSearch.forId === p.id && (
+            <div style={{marginTop:14,background:t.pillBg,borderRadius:12,padding:"12px 14px"}}>
+              {photoSearch.loading
+                ? <div style={{display:"flex",alignItems:"center",gap:8}}><div style={S.spinner}></div><span style={{fontSize:12,color:t.textSub}}>Looking up image...</span></div>
+                : photoSearch.results.length > 0
+                  ? <div>
+                      <span style={{...S.label,marginBottom:8,display:"block"}}>Select a photo</span>
+                      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(80px,1fr))",gap:8}}>
+                        {photoSearch.results.map((url,i) => <div key={i} style={{aspectRatio:"1",borderRadius:8,overflow:"hidden",border:`2px solid ${t.inputBorder}`,cursor:"pointer",background:t.card}} onClick={() => selectPhoto(p.id,url)}><img src={url} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}} onError={e=>{e.target.style.display="none"}}/></div>)}
+                      </div>
+                      <button style={{...S.btn,fontSize:11,marginTop:8,color:t.textMuted}} onClick={() => setPhotoSearch({loading:false,results:[],error:null,forId:null})}>Dismiss</button>
+                    </div>
+                  : <div>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                        <span style={S.label}>Paste Fragrantica URL</span>
+                        <a href={`https://www.fragrantica.com/search/?query=${encodeURIComponent(p.name+' '+p.house)}`} target="_blank" rel="noreferrer" style={{fontSize:11,color:t.accent,textDecoration:"none"}}>Search on Fragrantica →</a>
+                      </div>
+                      <p style={{fontSize:11,color:t.textMuted,margin:"0 0 8px",lineHeight:1.5}}>Find the perfume on Fragrantica, copy the page URL, paste it here.</p>
+                      <div style={{display:"flex",gap:6}}>
+                        <input style={{...S.input,margin:0,flex:1,fontSize:12}} placeholder="https://www.fragrantica.com/perfume/..." onKeyDown={e => e.key === "Enter" && searchPhotosByUrl(p.id, e.target.value)} id={`frag-url-${p.id}`}/>
+                        <button style={{...S.btn,fontSize:11,whiteSpace:"nowrap"}} onClick={() => searchPhotosByUrl(p.id, document.getElementById(`frag-url-${p.id}`).value)}>Get Image</button>
+                      </div>
+                      {photoSearch.error && <p style={{fontSize:11,color:"#c0392b",margin:"6px 0 0"}}>{photoSearch.error}</p>}
+                      <button style={{...S.btn,fontSize:11,marginTop:8,color:t.textMuted,borderColor:"transparent"}} onClick={() => setPhotoSearch({loading:false,results:[],error:null,forId:null})}>Cancel</button>
+                    </div>
+              }
+            </div>
+          )}
+
+          {p.archived ? (
+            <div style={{marginTop:20,background:t.pillBg,borderRadius:12,padding:"14px 16px"}}>
+              <p style={{margin:"0 0 4px",fontSize:12,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,color:t.textMuted}}>Archived</p>
+              <p style={{margin:"0 0 8px",fontSize:13,color:t.textSub}}>{p.archiveReason}</p>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <button style={{...S.btn,fontSize:11,padding:"6px 14px"}} onClick={() => { doUnarchive(p.id); setSelected({...p,archived:false,archiveReason:null,archivedAt:null}); }}>Restore to Collection</button>
+                <button style={{...S.btn,fontSize:11,padding:"6px 14px",color:"#c0392b",borderColor:"#f5c6c6"}} onClick={() => setShowDeleteConfirm(true)}>Delete permanently</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{marginTop:20,borderTop:`1px solid ${t.cardBorder}`,paddingTop:16,display:"flex",gap:12,alignItems:"center"}}>
+              <button style={{...S.btn,fontSize:11,color:t.textMuted,borderColor:t.inputBorder}} onClick={() => openArchiveModal(p)}>Archive this perfume</button>
+              <button style={{...S.btn,fontSize:11,color:"#c0392b",borderColor:"#f5c6c6"}} onClick={() => setShowDeleteConfirm(true)}>Delete permanently</button>
+            </div>
+          )}
+
+          {showDeleteConfirm && (
+            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+              <div style={{background:t.card,borderRadius:16,padding:24,width:"100%",maxWidth:380}}>
+                <h3 style={{margin:"0 0 8px",fontSize:16,fontWeight:700,fontFamily:"'Cormorant Garamond',Georgia,serif",color:t.text}}>Delete {p.name}?</h3>
+                <p style={{margin:"0 0 20px",fontSize:13,color:t.textSub,lineHeight:1.6}}>This removes it permanently, including all spray history. It cannot be undone.</p>
+                <div style={{display:"flex",gap:8}}>
+                  <button style={{...S.btn,flex:1}} onClick={() => setShowDeleteConfirm(false)}>Cancel</button>
+                  <button style={{...S.btn,flex:1,background:"#c0392b",color:"#fff",border:"none"}} onClick={() => doDelete(p.id)}>Delete</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {archiveModal?.id === p.id && (
+            <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+              <div style={{background:t.card,borderRadius:16,padding:24,width:"100%",maxWidth:400}}>
+                <h3 style={{margin:"0 0 4px",fontSize:16,fontWeight:700,fontFamily:"'Cormorant Garamond',Georgia,serif",color:t.text}}>Archive {p.name}?</h3>
+                <p style={{margin:"0 0 14px",fontSize:13,color:t.textSub}}>You can restore it anytime.</p>
+                <span style={S.label}>Reason</span>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10}}>{["Gave away","Finished","Sold","Broken / spilled","Lost interest"].map(r => <button key={r} onClick={() => setArchiveReason(r)} style={{padding:"6px 12px",borderRadius:20,border:`1.5px solid ${t.inputBorder}`,background:archiveReason===r?t.magenta:"transparent",color:archiveReason===r?"#fff":t.textSub,fontSize:12,cursor:"pointer",fontWeight:500,fontFamily:"'DM Sans',sans-serif"}}>{r}</button>)}</div>
+                <input style={S.input} placeholder="Or type a custom reason..." value={archiveReason} onChange={e => setArchiveReason(e.target.value)}/>
+                <div style={{display:"flex",gap:8}}><button style={{...S.btn,flex:1}} onClick={() => window.history.back()}>Cancel</button><button style={{...S.btn,flex:1,background:t.accent,color:"#fff",border:"none"}} onClick={doArchive}>Archive</button></div>
+              </div>
+            </div>
+          )}
+        </div>
+
+      {/* Edit modal */}
+      {showEdit && (
+        <div style={{position:"fixed",inset:0,background:"rgba(42,30,36,.7)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+          <div style={{background:t.card,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:480,maxHeight:"85vh",display:"flex",flexDirection:"column",boxShadow:"0 -4px 20px rgba(85,62,78,.2)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"18px 18px 10px"}}>
+              <h2 style={{fontSize:17,fontWeight:700,margin:0,fontFamily:"'Cormorant Garamond',Georgia,serif",color:t.text}}>Edit Perfume</h2>
+              <button style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:t.textMuted}} onClick={() => setShowEdit(false)}>x</button>
+            </div>
+            <div style={{padding:"0 18px 20px",overflowY:"auto",flex:1}}>
+              <input style={S.input} placeholder="Name *" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))}/>
+              <input style={S.input} placeholder="House *" value={form.house} onChange={e=>setForm(p=>({...p,house:e.target.value}))}/>
+              <textarea style={{...S.input,minHeight:70,resize:"vertical"}} placeholder="Description" value={form.description} onChange={e=>setForm(p=>({...p,description:e.target.value}))}/>
+              <input style={S.input} placeholder="Notes (comma-separated)" value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))}/>
+              <div style={{display:"flex",gap:8}}>
+                <input style={{...S.input,flex:1}} placeholder="Year" value={form.year} onChange={e=>setForm(p=>({...p,year:e.target.value}))}/>
+                <input style={{...S.input,flex:2}} placeholder="Concentration" value={form.concentration} onChange={e=>setForm(p=>({...p,concentration:e.target.value}))}/>
+              </div>
+              <input style={S.input} placeholder="Perfumer" value={form.perfumer} onChange={e=>setForm(p=>({...p,perfumer:e.target.value}))}/>
+              <span style={S.label}>Categories</span>
+              <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:16}}>{ALL_CATEGORIES.map(c => <button key={c} onClick={()=>setForm(p=>({...p,categories:p.categories.includes(c)?p.categories.filter(x=>x!==c):[...p.categories,c]}))} style={{padding:"5px 12px",borderRadius:20,border:"1.5px solid "+t.inputBorder,background:form.categories.includes(c)?t.plum:"transparent",color:form.categories.includes(c)?"#fff":t.textSub,fontSize:11,cursor:"pointer",fontWeight:500,fontFamily:"'DM Sans',sans-serif"}}>{c}</button>)}</div>
+              <button style={{...S.btn,background:t.accent,color:"#fff",border:"none",width:"100%",padding:"12px 0"}} onClick={saveEdit}>Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Chat bubble */}
+      <button onClick={() => setShowChat(true)} style={{position:"fixed",bottom:28,right:20,width:52,height:52,borderRadius:"50%",background:"linear-gradient(135deg,#553e4e 0%,#e0479e 100%)",border:"none",boxShadow:"0 4px 16px rgba(85,62,78,.4)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:900}}>
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M20 2H4a2 2 0 00-2 2v12a2 2 0 002 2h4l4 4 4-4h4a2 2 0 002-2V4a2 2 0 00-2-2z" stroke="white" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/></svg>
+      </button>
+
+      {showChat && (
+        <div style={{position:"fixed",inset:0,background:"rgba(42,30,36,.6)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={() => setShowChat(false)}>
+          <div style={{background:t.card,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:480,height:"72vh",display:"flex",flexDirection:"column",boxShadow:"0 -4px 20px rgba(85,62,78,.2)"}} onClick={e => e.stopPropagation()}>
+            <div style={{padding:"16px 18px 12px",borderBottom:"1px solid "+t.cardBorder,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <p style={{margin:0,fontSize:16,fontWeight:700,fontFamily:"'Cormorant Garamond',Georgia,serif",color:t.text}}>Fragrance Advisor</p>
+                <p style={{margin:"2px 0 0",fontSize:11,color:t.textMuted}}>Recommendations from your collection</p>
+              </div>
+              <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                {chatMessages.length > 0 && <button onClick={() => setChatMessages([])} style={{background:"none",border:"none",fontSize:11,color:t.textMuted,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Clear</button>}
+                <button onClick={() => setShowChat(false)} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:t.textMuted,lineHeight:1}}>x</button>
+              </div>
+            </div>
+            <div style={{flex:1,overflowY:"auto",padding:"14px 18px",display:"flex",flexDirection:"column",gap:10}}>
+              {chatMessages.length === 0 && <p style={{fontSize:13,color:t.textMuted,lineHeight:1.65,marginTop:8,textAlign:"center"}}>Tell me about the occasion, your mood, or the kind of scent you are after. I will recommend something from your collection.</p>}
+              {chatMessages.map((m,i) => (
+                <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start"}}>
+                  <div style={{maxWidth:"80%",padding:"10px 14px",borderRadius:m.role==="user"?"16px 16px 4px 16px":"4px 16px 16px 16px",background:m.role==="user"?"linear-gradient(135deg,#553e4e,#e0479e)":t.pillBg,color:m.role==="user"?"#fff":t.text,fontSize:13,lineHeight:1.65,whiteSpace:"pre-wrap"}}>{m.content}</div>
+                </div>
+              ))}
+              {chatLoading && (
+                <div style={{display:"flex",justifyContent:"flex-start"}}>
+                  <div style={{padding:"10px 14px",borderRadius:"4px 16px 16px 16px",background:t.pillBg,display:"flex",gap:5,alignItems:"center"}}>
+                    <span style={{width:6,height:6,borderRadius:"50%",background:t.textMuted,display:"inline-block",animation:"chatDot 1.2s 0s infinite"}}/>
+                    <span style={{width:6,height:6,borderRadius:"50%",background:t.textMuted,display:"inline-block",animation:"chatDot 1.2s 0.2s infinite"}}/>
+                    <span style={{width:6,height:6,borderRadius:"50%",background:t.textMuted,display:"inline-block",animation:"chatDot 1.2s 0.4s infinite"}}/>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef}/>
+            </div>
+            <div style={{padding:"12px 18px",borderTop:"1px solid "+t.cardBorder,display:"flex",gap:8,background:t.card}}>
+              <input style={{...S.input,margin:0,flex:1,fontSize:13,padding:"10px 14px"}} placeholder="What are you looking for today?" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key==="Enter" && !e.shiftKey && sendChat()} disabled={chatLoading}/>
+              <button onClick={sendChat} disabled={chatLoading || !chatInput.trim()} style={{padding:"10px 18px",borderRadius:10,border:"none",background:chatInput.trim()?"linear-gradient(135deg,#553e4e,#e0479e)":t.pillBg,color:chatInput.trim()?"#fff":t.textMuted,fontSize:13,fontWeight:600,cursor:chatInput.trim()?"pointer":"default",fontFamily:"'DM Sans',sans-serif"}}>Send</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+    );
+  }
+
+  // MAIN VIEW
+  return (
+    <div style={S.wrap}>
+      <div style={{paddingTop:20,marginBottom:16}}>
+        <div style={{display:"flex",alignItems:"baseline",justifyContent:"space-between"}}>
+          <div style={{display:"flex",alignItems:"baseline",gap:10}}>
+            <h1 style={{fontSize:26,fontWeight:700,letterSpacing:"-0.5px",margin:0,color:t.text,fontFamily:"'Cormorant Garamond',Georgia,serif"}}>{showArchived ? "Archive" : "Fragrance Collection"}</h1>
+            <span style={{fontSize:13,fontWeight:500,color:t.textMuted,background:t.pillBg,borderRadius:20,padding:"2px 10px"}}>{showArchived ? archiveCount : activeCount}</span>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <button style={{background:"none",border:"none",fontSize:13,color:t.accent,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontWeight:600}} onClick={() => { setProfile(null); localStorage.removeItem("fragrance-profile"); }}>{profile}</button>
+            <button style={{background:"none",border:"none",fontSize:13,color:t.textMuted,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",fontWeight:500}} onClick={() => openSettings()}>Settings</button>
+          </div>
+        </div>
+        {isSyncing && <p style={{fontSize:11,color:t.textMuted,margin:"8px 0 0",fontStyle:"italic"}}>Syncing collection...</p>}
+        {!isSyncing && syncStatus === "error" && <p style={{fontSize:11,color:"#c0392b",margin:"8px 0 0"}}>Could not reach Supabase. Showing cached data.</p>}
+        {supabaseConfigured && !isOnline && (
+          <div style={{marginTop:10,background:"#fff8e1",borderRadius:8,padding:"8px 12px",fontSize:12,color:"#7d6608",fontWeight:500}}>
+            You're offline. Browse freely — adding, spraying, and archiving are paused until you're back online.
+          </div>
+        )}
+      </div>
+
+      <div style={{display:"flex",gap:3,marginBottom:16,background:t.pillBg,borderRadius:10,padding:3}}>
+        <button style={{flex:1,padding:"10px 0",border:"none",background:t.card,borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",color:t.text,fontFamily:"'DM Sans',sans-serif",boxShadow:"0 1px 3px rgba(0,0,0,.08)"}}>Collection</button>
+        <button style={{flex:1,padding:"10px 0",border:"none",background:"transparent",borderRadius:8,fontSize:12,fontWeight:600,cursor:"pointer",color:t.textSub,fontFamily:"'DM Sans',sans-serif"}} onClick={() => openAdd()}>+ Add</button>
+      </div>
+
+      {/* Daily pick popup */}
+      {showDailyPop && dailyPick && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.6)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={() => setShowDailyPop(false)}>
+          <div style={{width:"100%",maxWidth:380}} onClick={e => e.stopPropagation()}>
+            <p style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1.5,color:"rgba(255,255,255,.5)",marginBottom:10}}>Today's Pick</p>
+            <div style={S.dailyCard} onClick={() => { setShowDailyPop(false); openDetail(perfumes.find(p => p.id === dailyPick.id) || dailyPick); }}>
+              <p style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1,color:"rgba(255,255,255,.5)",margin:"0 0 4px"}}>{dailyPick.house}</p>
+              <p style={{fontSize:22,fontWeight:700,margin:"0 0 10px",color:"#fff",fontFamily:"'Cormorant Garamond',Georgia,serif"}}>{dailyPick.name}</p>
+              {dailyPick.description && <p style={{fontSize:13,lineHeight:1.6,color:"rgba(255,255,255,.7)",margin:"0 0 14px"}}>{dailyPick.description.slice(0,150)}...</p>}
+              <p style={{fontSize:11,color:"rgba(255,255,255,.4)",fontStyle:"italic",margin:0}}>{dailyPick.reason}</p>
+            </div>
+            <div style={{display:"flex",gap:6,marginTop:12}}>{["random","seasonal"].map(m => <button key={m} onClick={() => setDailyMode(m)} style={{padding:"8px 14px",borderRadius:8,border:"1.5px solid rgba(255,255,255,.2)",background:dailyMode===m?"#fff":"transparent",color:dailyMode===m?t.grape:"rgba(255,255,255,.6)",fontSize:12,fontWeight:500,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>{m==="random"?"Random":`Seasonal (${getSeason()})`}</button>)}</div>
+            <button onClick={() => setShowDailyPop(false)} style={{marginTop:14,width:"100%",padding:"12px 0",borderRadius:8,border:"none",background:"rgba(255,255,255,.12)",color:"rgba(255,255,255,.6)",fontSize:13,fontWeight:500,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Dismiss</button>
+          </div>
+        </div>
+      )}
+
+      {/* Settings modal */}
+      {showSettings && (
+        <div style={S.overlay}><div style={S.modal}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"18px 18px 10px"}}>
+            <h2 style={{fontSize:17,fontWeight:700,margin:0,fontFamily:"'Cormorant Garamond',Georgia,serif",color:t.text}}>Settings</h2>
+            <button style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:t.textMuted}} onClick={() => window.history.back()}>✕</button>
+          </div>
+          <div style={{padding:"0 18px 20px",overflowY:"auto",flex:1}}>
+            <span style={S.label}>Anthropic API Key</span>
+            <p style={{fontSize:12,color:t.textMuted,margin:"0 0 8px"}}>Required for Enrich and Auto-fill. Get one at console.anthropic.com</p>
+            <input style={S.input} type="password" placeholder="sk-ant-..." value={apiKey} onChange={e => saveApiKey(e.target.value)}/>
+            <div style={{height:1,background:t.cardBorder,margin:"12px 0"}}/>
+            <span style={S.label}>Image Search</span>
+            <p style={{fontSize:12,color:t.textMuted,margin:"0 0 4px"}}>Uses your Anthropic key above — no extra setup needed. Searches Fragrantica for bottle images.</p>
+            <div style={{height:1,background:t.cardBorder,margin:"12px 0"}}/>
+            <span style={S.label}>Supabase URL</span>
+            <p style={{fontSize:12,color:t.textMuted,margin:"0 0 8px"}}>Your project URL. Find it in Supabase → Project Settings → API.</p>
+            <input style={S.input} type="text" placeholder="https://xxxx.supabase.co" value={supabaseUrl} onChange={e => saveSupabaseUrl(e.target.value)}/>
+            <span style={S.label}>Supabase Anon Key</span>
+            <p style={{fontSize:12,color:t.textMuted,margin:"0 0 8px"}}>The public anon key. Same page as the URL above.</p>
+            <input style={S.input} type="password" placeholder="eyJ..." value={supabaseKey} onChange={e => saveSupabaseKey(e.target.value)}/>
+            {supabaseConfigured && <p style={{fontSize:12,color:t.sage,margin:"4px 0 0",fontWeight:600}}>Supabase connected. Both keys are saved locally on this device only.</p>}
+            {supabaseConfigured && <p style={{fontSize:11,color:t.textMuted,margin:"6px 0 0"}}>Reload the app to trigger a fresh sync after changing these values.</p>}
+          </div>
+        </div></div>
+      )}
+
+      {/* Add form */}
+      {showAdd && (
+        <div style={S.overlay}><div style={S.modal}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"18px 18px 10px"}}>
+            <h2 style={{fontSize:17,fontWeight:700,margin:0,fontFamily:"'Cormorant Garamond',Georgia,serif",color:t.text}}>Add Perfume</h2>
+            <button style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:t.textMuted}} onClick={() => window.history.back()}>✕</button>
+          </div>
+          <div style={{padding:"0 18px 20px",overflowY:"auto",flex:1}}>
+            <input style={S.input} placeholder="Name *" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))}/>
+            <input style={S.input} placeholder="House *" value={form.house} onChange={e=>setForm(p=>({...p,house:e.target.value}))}/>
+            {form.name.trim() && form.house.trim() && (
+              <button style={{...S.btn,width:"100%",marginBottom:12,padding:"10px 0",background:enrichingForm?"transparent":t.sage,color:enrichingForm?t.textSub:"#fff",border:enrichingForm?`1.5px solid ${t.inputBorder}`:"none"}} onClick={enrichForm} disabled={enrichingForm}>
+                {enrichingForm ? <span style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8}}><span style={{...S.spinner,width:14,height:14,display:"inline-block"}}></span> Enriching...</span> : "Auto-fill from web"}
+              </button>
+            )}
+            {enrichError && <p style={{fontSize:11,color:"#c0392b",margin:"-6px 0 10px",lineHeight:1.5}}>{enrichError}</p>}
+            <textarea style={{...S.input,minHeight:70,resize:"vertical"}} placeholder="Description" value={form.description} onChange={e=>setForm(p=>({...p,description:e.target.value}))}/>
+            <input style={S.input} placeholder="Notes (comma-separated)" value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))}/>
+            <div style={{display:"flex",gap:8}}><input style={{...S.input,flex:1}} placeholder="Year" value={form.year} onChange={e=>setForm(p=>({...p,year:e.target.value}))}/><input style={{...S.input,flex:2}} placeholder="Concentration" value={form.concentration} onChange={e=>setForm(p=>({...p,concentration:e.target.value}))}/></div>
+            <input style={S.input} placeholder="Perfumer" value={form.perfumer} onChange={e=>setForm(p=>({...p,perfumer:e.target.value}))}/>
+            <span style={S.label}>Categories</span>
+            <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:12}}>{ALL_CATEGORIES.map(c => <button key={c} onClick={()=>setForm(p=>({...p,categories:p.categories.includes(c)?p.categories.filter(x=>x!==c):[...p.categories,c]}))} style={{padding:"5px 12px",borderRadius:20,border:`1.5px solid ${t.inputBorder}`,background:form.categories.includes(c)?t.plum:"transparent",color:form.categories.includes(c)?"#fff":t.textSub,fontSize:11,cursor:"pointer",fontWeight:500,fontFamily:"'DM Sans',sans-serif"}}>{c}</button>)}</div>
+            <div style={{display:"flex",alignItems:"center",gap:10}}><input type="file" accept="image/*" id="np" style={{display:"none"}} onChange={e=>handlePhoto(e,"new")}/><button style={S.btn} onClick={()=>document.getElementById("np")?.click()}>Add Photo</button>{form.photoUrl && <img src={form.photoUrl} style={{width:48,height:48,borderRadius:8,objectFit:"cover"}}/>}</div>
+            <button style={{...S.btn,background:t.accent,color:"#fff",border:"none",width:"100%",marginTop:14,padding:"12px 0"}} onClick={addPerfume}>Add to Collection</button>
+          </div>
+        </div></div>
+      )}
+
+      {/* Grid */}
+      <input style={S.search} type="text" placeholder="Search name, house, notes..." value={search} onChange={e=>setSearch(e.target.value)}/>
+      <div style={{display:"flex",gap:8,marginBottom:8}}>
+        <select style={S.sel} value={houseFilter} onChange={e=>setHouseFilter(e.target.value)}>{houses.map(h => <option key={h} value={h}>{h==="All"?"All Houses":h}</option>)}</select>
+        <select style={S.sel} value={catFilter} onChange={e=>setCatFilter(e.target.value)}>{cats.map(c => <option key={c} value={c}>{c==="All"?"All Categories":c}</option>)}</select>
+      </div>
+      <div style={{marginBottom:8}}>
+        <select style={{...S.sel,width:"100%"}} value={sortBy} onChange={e=>setSortBy(e.target.value)}>
+          <option value="name-az">Sort: Name A-Z</option><option value="name-za">Sort: Name Z-A</option><option value="house-az">Sort: House A-Z</option>
+          <option value="recently-used">Sort: Recently worn</option><option value="least-used">Sort: Least recently worn</option><option value="never-used">Sort: Never worn first</option>
+        </select>
+      </div>
+
+      {archiveCount > 0 && (
+        <div style={{marginBottom:14}}>
+          <button onClick={() => { setShowArchived(!showArchived); setCatFilter("All"); setHouseFilter("All"); setSearch(""); }} style={{...S.btn,fontSize:11,padding:"6px 12px",background:showArchived?t.plum:"transparent",color:showArchived?"#fff":t.textMuted,borderColor:showArchived?t.plum:t.inputBorder}}>{showArchived ? "Back to Collection" : `Archive (${archiveCount})`}</button>
+        </div>
+      )}
+
+      <div style={S.grid}>
+        {sorted.map((p, idx) => {
+          const phBg = placeholderColors[idx % placeholderColors.length];
+          return (
+          <div key={p.id} style={{...S.card,...(p.archived?{opacity:.7}:{})}} onClick={() => openDetail(p)}>
+            {p.photoUrl ? <div style={{...S.cImgW,background:"#ffffff",display:"flex",alignItems:"center",justifyContent:"center"}}><img src={p.photoUrl} alt="" style={{width:"100%",height:"100%",objectFit:"contain",padding:8}}/></div>
+            : <div style={{...S.cImgW,display:"flex",alignItems:"center",justifyContent:"center",background:phBg}}><span style={{fontSize:32,fontWeight:700,color:dark?"rgba(255,255,255,.25)":"rgba(85,62,78,.2)",fontFamily:"'Cormorant Garamond',Georgia,serif"}}>{p.name.charAt(0)}</span></div>}
+            <div style={{padding:"10px 12px 12px"}}>
+              <p style={{fontSize:10,fontWeight:700,textTransform:"uppercase",letterSpacing:.5,color:t.textMuted,margin:"0 0 2px"}}>{p.house}</p>
+              <p style={{fontSize:13,fontWeight:600,lineHeight:1.3,margin:0,color:t.text}}>{p.name}</p>
+              {p.archived && p.archiveReason && <p style={{fontSize:10,color:t.textMuted,margin:"4px 0 0",fontStyle:"italic"}}>{p.archiveReason}</p>}
+              {!p.archived && (p.categories||[]).length > 0 && <div style={{display:"flex",gap:4,marginTop:6,flexWrap:"wrap"}}>{p.categories.slice(0,2).map(c => { const cc = pickCat(c); return <span key={c} style={{fontSize:9,padding:"2px 7px",borderRadius:20,background:cc.bg+"33",color:cc.color,fontWeight:600}}>{c}</span>; })}</div>}
+              {!p.archived && p.lastUsed && <p style={{fontSize:10,color:t.textMuted,margin:"4px 0 0"}}>{formatDate(p.lastUsed)}</p>}
+            </div>
+          </div>
+          );
+        })}
+      </div>
+      {!filtered.length && <p style={{textAlign:"center",padding:40,color:t.textMuted,fontSize:14}}>No perfumes match your filters.</p>}
+      <div style={{display:"flex",justifyContent:"center",gap:20,padding:"20px 0",fontSize:11,color:t.textMuted,fontWeight:500}}>
+        <span>{activeCount} active</span><span>{archiveCount} archived</span>
+      </div>
+
+      {/* Chat bubble */}
+      <button onClick={() => setShowChat(true)} style={{position:"fixed",bottom:28,right:20,width:52,height:52,borderRadius:"50%",background:"linear-gradient(135deg,#553e4e 0%,#e0479e 100%)",border:"none",boxShadow:"0 4px 16px rgba(85,62,78,.4)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:900}}>
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M20 2H4a2 2 0 00-2 2v12a2 2 0 002 2h4l4 4 4-4h4a2 2 0 002-2V4a2 2 0 00-2-2z" stroke="white" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/></svg>
+      </button>
+
+      {showChat && (
+        <div style={{position:"fixed",inset:0,background:"rgba(42,30,36,.6)",zIndex:1000,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={() => setShowChat(false)}>
+          <div style={{background:t.card,borderRadius:"20px 20px 0 0",width:"100%",maxWidth:480,height:"72vh",display:"flex",flexDirection:"column",boxShadow:"0 -4px 20px rgba(85,62,78,.2)"}} onClick={e => e.stopPropagation()}>
+            <div style={{padding:"16px 18px 12px",borderBottom:"1px solid "+t.cardBorder,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <p style={{margin:0,fontSize:16,fontWeight:700,fontFamily:"'Cormorant Garamond',Georgia,serif",color:t.text}}>Fragrance Advisor</p>
+                <p style={{margin:"2px 0 0",fontSize:11,color:t.textMuted}}>Recommendations from your collection</p>
+              </div>
+              <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                {chatMessages.length > 0 && <button onClick={() => setChatMessages([])} style={{background:"none",border:"none",fontSize:11,color:t.textMuted,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Clear</button>}
+                <button onClick={() => setShowChat(false)} style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:t.textMuted,lineHeight:1}}>x</button>
+              </div>
+            </div>
+            <div style={{flex:1,overflowY:"auto",padding:"14px 18px",display:"flex",flexDirection:"column",gap:10}}>
+              {chatMessages.length === 0 && <p style={{fontSize:13,color:t.textMuted,lineHeight:1.65,marginTop:8,textAlign:"center"}}>Tell me about the occasion, your mood, or the kind of scent you are after. I will recommend something from your collection.</p>}
+              {chatMessages.map((m,i) => (
+                <div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start"}}>
+                  <div style={{maxWidth:"80%",padding:"10px 14px",borderRadius:m.role==="user"?"16px 16px 4px 16px":"4px 16px 16px 16px",background:m.role==="user"?"linear-gradient(135deg,#553e4e,#e0479e)":t.pillBg,color:m.role==="user"?"#fff":t.text,fontSize:13,lineHeight:1.65,whiteSpace:"pre-wrap"}}>{m.content}</div>
+                </div>
+              ))}
+              {chatLoading && (
+                <div style={{display:"flex",justifyContent:"flex-start"}}>
+                  <div style={{padding:"10px 14px",borderRadius:"4px 16px 16px 16px",background:t.pillBg,display:"flex",gap:5,alignItems:"center"}}>
+                    <span style={{width:6,height:6,borderRadius:"50%",background:t.textMuted,display:"inline-block",animation:"chatDot 1.2s 0s infinite"}}/>
+                    <span style={{width:6,height:6,borderRadius:"50%",background:t.textMuted,display:"inline-block",animation:"chatDot 1.2s 0.2s infinite"}}/>
+                    <span style={{width:6,height:6,borderRadius:"50%",background:t.textMuted,display:"inline-block",animation:"chatDot 1.2s 0.4s infinite"}}/>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef}/>
+            </div>
+            <div style={{padding:"12px 18px",borderTop:"1px solid "+t.cardBorder,display:"flex",gap:8,background:t.card}}>
+              <input style={{...S.input,margin:0,flex:1,fontSize:13,padding:"10px 14px"}} placeholder="What are you looking for today?" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key==="Enter" && !e.shiftKey && sendChat()} disabled={chatLoading}/>
+              <button onClick={sendChat} disabled={chatLoading || !chatInput.trim()} style={{padding:"10px 18px",borderRadius:10,border:"none",background:chatInput.trim()?"linear-gradient(135deg,#553e4e,#e0479e)":t.pillBg,color:chatInput.trim()?"#fff":t.textMuted,fontSize:13,fontWeight:600,cursor:chatInput.trim()?"pointer":"default",fontFamily:"'DM Sans',sans-serif"}}>Send</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.render(<App/>, document.getElementById("root"));
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
