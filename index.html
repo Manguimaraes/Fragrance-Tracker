@@ -311,6 +311,34 @@ async function upsertPerfume(p) {
   return null;
 }
 
+async function uploadPhotoToStorage(sb, perfumeId, source) {
+  try {
+    let blob, contentType = 'image/jpeg';
+    if (source.startsWith('data:')) {
+      // Base64 data URL from device upload
+      const [header, data] = source.split(',');
+      contentType = header.match(/:(.*?);/)[1];
+      const bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
+      blob = new Blob([bytes], { type: contentType });
+    } else {
+      // External URL — fetch via server-side proxy to avoid CORS
+      const proxied = `/api/proxy-image?url=${encodeURIComponent(source)}`;
+      const res = await fetch(proxied);
+      if (!res.ok) { console.error('Proxy fetch failed', res.status); return null; }
+      blob = await res.blob();
+      contentType = blob.type || 'image/jpeg';
+    }
+    const ext = contentType.split('/')[1]?.split('+')[0] || 'jpg';
+    const path = `perfume-photos/${perfumeId}.${ext}`;
+    const { error } = await sb.storage.from('photos').upload(path, blob, { contentType, upsert: true });
+    if (error) { console.error('Storage upload error', error); return null; }
+    return sb.storage.from('photos').getPublicUrl(path).data.publicUrl;
+  } catch (err) {
+    console.error('Storage upload failed', err);
+    return null;
+  }
+}
+
 async function insertPerfumeToDb(p) {
   const sb = getClient(); if (!sb) return;
   const row = perfumeToRow(p); delete row.updated_at;
@@ -396,6 +424,7 @@ function App() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState(null); // null | "ok" | "error"
+  const [migrateProgress, setMigrateProgress] = useState(null); // null | {done,total,errors}
   const fileRef = useRef(null);
   const [enriching, setEnriching] = useState(null);
   const [showChat, setShowChat] = useState(false);
@@ -547,7 +576,7 @@ ${JSON.stringify(library)}`;
   };
 
   const searchPhotosByUrl = (pid, fragrancticaUrl) => {
-    const match = fragrancticaUrl.match(/-(\d{3,6})\.html/);
+    const match = fragrancticaUrl.match(/-(\d+)\.html/);
     if (match) {
       const url = `https://fimgs.net/mdimg/perfume/375x500.${match[1]}.jpg`;
       setPhotoSearch(prev => ({ ...prev, results: [url], error: null }));
@@ -558,13 +587,44 @@ ${JSON.stringify(library)}`;
 
   const selectPhoto = async (pid, url) => {
     const perfume = perfumes.find(p => p.id === pid);
+    let finalUrl = url;
+    // Upload to storage if available, fall back to original URL
     if (perfume && supabaseConfigured && isOnline) {
-      const err = await upsertPerfume({ ...perfume, photoUrl: url });
-      if (err) { setSyncStatus("error"); return; }
+      setPhotoSearch(prev => ({ ...prev, loading: true }));
+      const sb = getClient();
+      if (sb) {
+        const storageUrl = await uploadPhotoToStorage(sb, pid, url);
+        if (storageUrl) finalUrl = storageUrl;
+      }
     }
-    setPerfumes(prev => prev.map(p => p.id === pid ? { ...p, photoUrl: url } : p));
-    if (selected?.id === pid) setSelected(prev => ({ ...prev, photoUrl: url }));
+    // Always update local state regardless of DB outcome
+    setPerfumes(prev => prev.map(p => p.id === pid ? { ...p, photoUrl: finalUrl } : p));
+    if (selected?.id === pid) setSelected(prev => ({ ...prev, photoUrl: finalUrl }));
     setPhotoSearch({ loading: false, results: [], forId: null });
+    // Best-effort DB write
+    if (perfume && supabaseConfigured && isOnline) {
+      const err = await upsertPerfume({ ...perfume, photoUrl: finalUrl });
+      if (err) setSyncStatus("error");
+    }
+  };
+
+  const migratePhotos = async () => {
+    const sb = getClient(); if (!sb) return;
+    const toMigrate = perfumes.filter(p => p.photoUrl && !p.photoUrl.includes('supabase.co'));
+    if (!toMigrate.length) { setMigrateProgress({ done: 0, total: 0, errors: 0 }); return; }
+    setMigrateProgress({ done: 0, total: toMigrate.length, errors: 0 });
+    let done = 0, errors = 0;
+    for (const p of toMigrate) {
+      const storageUrl = await uploadPhotoToStorage(sb, p.id, p.photoUrl);
+      if (storageUrl) {
+        const err = await upsertPerfume({ ...p, photoUrl: storageUrl });
+        if (!err) {
+          setPerfumes(prev => prev.map(q => q.id === p.id ? { ...q, photoUrl: storageUrl } : q));
+          done++;
+        } else { errors++; }
+      } else { errors++; }
+      setMigrateProgress(prev => ({ ...prev, done: done + errors, errors }));
+    }
   };
 
   // Load data
@@ -856,14 +916,26 @@ ${JSON.stringify(library)}`;
     const f = e.target.files?.[0]; if (!f) return;
     const r = new FileReader();
     r.onload = async (ev) => {
-      const url = ev.target.result;
-      if (pid === "new") setForm(p => ({...p, photoUrl: url}));
-      else {
-        setPerfumes(prev => prev.map(p => p.id === pid ? {...p, photoUrl: url} : p));
-        if (selected?.id === pid) setSelected(prev => ({...prev, photoUrl: url}));
+      const dataUrl = ev.target.result;
+      if (pid === "new") {
+        setForm(p => ({...p, photoUrl: dataUrl}));
+      } else {
+        // Show immediately from base64 while upload runs in background
+        setPerfumes(prev => prev.map(p => p.id === pid ? {...p, photoUrl: dataUrl} : p));
+        if (selected?.id === pid) setSelected(prev => ({...prev, photoUrl: dataUrl}));
         const perfume = perfumes.find(p => p.id === pid);
         if (perfume && supabaseConfigured && isOnline) {
-          const err = await upsertPerfume({...perfume, photoUrl: url});
+          const sb = getClient();
+          let finalUrl = dataUrl;
+          if (sb) {
+            const storageUrl = await uploadPhotoToStorage(sb, pid, dataUrl);
+            if (storageUrl) {
+              finalUrl = storageUrl;
+              setPerfumes(prev => prev.map(p => p.id === pid ? {...p, photoUrl: storageUrl} : p));
+              if (selected?.id === pid) setSelected(prev => ({...prev, photoUrl: storageUrl}));
+            }
+          }
+          const err = await upsertPerfume({...perfume, photoUrl: finalUrl});
           if (err) setSyncStatus("error");
         }
       }
@@ -1259,6 +1331,29 @@ ${JSON.stringify(library)}`;
             <input style={S.input} type="password" placeholder="eyJ..." value={supabaseKey} onChange={e => saveSupabaseKey(e.target.value)}/>
             {supabaseConfigured && <p style={{fontSize:12,color:t.sage,margin:"4px 0 0",fontWeight:600}}>Supabase connected. Both keys are saved locally on this device only.</p>}
             {supabaseConfigured && <p style={{fontSize:11,color:t.textMuted,margin:"6px 0 0"}}>Reload the app to trigger a fresh sync after changing these values.</p>}
+            {supabaseConfigured && (<>
+              <div style={{height:1,background:t.cardBorder,margin:"16px 0"}}/>
+              <span style={S.label}>Migrate Photos to Storage</span>
+              <p style={{fontSize:12,color:t.textMuted,margin:"0 0 10px"}}>Copies all fimgs.net photos into your Supabase Storage bucket so you own them permanently.</p>
+              {migrateProgress === null && (
+                <button style={{...S.btn,width:"100%"}} onClick={migratePhotos}>Run migration</button>
+              )}
+              {migrateProgress !== null && migrateProgress.total === 0 && (
+                <p style={{fontSize:12,color:t.sage,fontWeight:600,margin:0}}>All photos are already in Supabase Storage.</p>
+              )}
+              {migrateProgress !== null && migrateProgress.total > 0 && (
+                <>
+                  <div style={{background:t.inputBorder,borderRadius:4,height:6,marginBottom:8,overflow:"hidden"}}>
+                    <div style={{background:t.sage,height:"100%",width:`${(migrateProgress.done/migrateProgress.total)*100}%`,transition:"width .3s"}}/>
+                  </div>
+                  <p style={{fontSize:12,margin:0,color:t.textSub}}>
+                    {migrateProgress.done < migrateProgress.total
+                      ? `Migrating… ${migrateProgress.done} of ${migrateProgress.total}`
+                      : `Done. ${migrateProgress.done - migrateProgress.errors} migrated${migrateProgress.errors ? `, ${migrateProgress.errors} failed` : ""}.`}
+                  </p>
+                </>
+              )}
+            </>)}
           </div>
         </div></div>
       )}
